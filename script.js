@@ -209,39 +209,71 @@ function renderResources() {
         return;
     }
 
-    resourceGallery.innerHTML = resources.map((res, index) => `
-        <div class="resource-card group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all animate-fade-in" style="animation-delay: ${index * 0.1}s">
-            <div class="aspect-video overflow-hidden relative">
-                <img src="${res.image}" alt="${res.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer">
-                <div class="resource-overlay absolute inset-0 bg-indigo-900/40 flex items-center justify-center gap-3">
-                    <button class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-600 hover:scale-110 transition-transform">
-                        <i data-lucide="${res.type === 'Video' ? 'play' : 'eye'}" class="w-5 h-5"></i>
-                    </button>
-                    <button class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 hover:scale-110 transition-transform">
-                        <i data-lucide="bookmark" class="w-5 h-5"></i>
-                    </button>
-                </div>
-                <div class="absolute top-3 left-3 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
-                    <i data-lucide="${res.is_offline ? 'hard-drive' : 'globe'}" class="w-3 h-3"></i>
-                    ${res.type}
-                </div>
-            </div>
-            <div class="p-4">
-                <div class="flex items-start justify-between mb-1">
-                    <h3 class="font-bold text-slate-800 leading-tight">${res.title}</h3>
-                    ${res.link_url || res.file_name ? `
-                        <a href="${res.link_url || '#'}" target="_blank" class="text-indigo-600 hover:text-indigo-800">
-                            <i data-lucide="external-link" class="w-4 h-4"></i>
+    // Helper to format URLs correctly
+    const getFormattedUrl = (res) => {
+        const url = res.link_url || '';
+        if (!url) return '#';
+
+        if (res.is_offline) {
+            // Handle local file paths (e.g., C:/path or /Users/path)
+            // Prepend file:/// if it looks like a local path and doesn't have a protocol
+            if (!url.includes('://')) {
+                const cleanPath = url.replace(/\\/g, '/');
+                if (cleanPath.match(/^[a-zA-Z]:/)) {
+                    return `file:///${cleanPath}`;
+                }
+                if (cleanPath.startsWith('/')) {
+                    return `file://${cleanPath}`;
+                }
+                return `file:///${cleanPath}`;
+            }
+            return url;
+        } else {
+            // Ensure online URLs have a protocol to prevent relative redirection
+            if (!url.includes('://') && !url.startsWith('#')) {
+                return `https://${url}`;
+            }
+            return url;
+        }
+    };
+
+    resourceGallery.innerHTML = resources.map((res, index) => {
+        const finalUrl = getFormattedUrl(res);
+        
+        return `
+            <div class="resource-card group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all animate-fade-in" style="animation-delay: ${index * 0.1}s">
+                <div class="aspect-video overflow-hidden relative">
+                    <img src="${res.image}" alt="${res.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer">
+                    <div class="resource-overlay absolute inset-0 bg-indigo-900/40 flex items-center justify-center gap-3">
+                        <a href="${finalUrl}" target="_blank" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-600 hover:scale-110 transition-transform">
+                            <i data-lucide="${res.type === 'Video' ? 'play' : 'eye'}" class="w-5 h-5"></i>
                         </a>
-                    ` : ''}
+                        <button class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 hover:scale-110 transition-transform">
+                            <i data-lucide="bookmark" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="absolute top-3 left-3 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
+                        <i data-lucide="${res.is_offline ? 'hard-drive' : 'globe'}" class="w-3 h-3"></i>
+                        ${res.type}
+                    </div>
                 </div>
-                <p class="text-xs text-slate-500 mb-3">${res.author || 'Unknown'}</p>
-                <div class="flex flex-wrap gap-1">
-                    ${(res.tags || []).map(tag => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">${tag}</span>`).join('')}
+                <div class="p-4">
+                    <div class="flex items-start justify-between mb-1">
+                        <h3 class="font-bold text-slate-800 leading-tight">${res.title}</h3>
+                        ${res.link_url || res.file_name ? `
+                            <a href="${finalUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800" title="${res.is_offline ? 'Open Local File' : 'Open Link'}">
+                                <i data-lucide="${res.is_offline ? 'folder-open' : 'external-link'}" class="w-4 h-4"></i>
+                            </a>
+                        ` : ''}
+                    </div>
+                    <p class="text-xs text-slate-500 mb-3">${res.author || 'Unknown'}</p>
+                    <div class="flex flex-wrap gap-1">
+                        ${(res.tags || []).map(tag => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">${tag}</span>`).join('')}
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
     lucide.createIcons();
 }
 
