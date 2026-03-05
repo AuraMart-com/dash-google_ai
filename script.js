@@ -22,7 +22,9 @@ const MOCK_RESOURCES = [
         type: "Book",
         author: "James Clear",
         image: "https://picsum.photos/seed/habits/400/300",
-        tags: ["Productivity", "Self-help"]
+        tags: ["Productivity", "Self-help"],
+        is_offline: false,
+        link_url: "https://jamesclear.com/atomic-habits"
     },
     {
         id: 2,
@@ -30,7 +32,9 @@ const MOCK_RESOURCES = [
         type: "Video",
         author: "Frontend Masters",
         image: "https://picsum.photos/seed/react/400/300",
-        tags: ["Development", "React"]
+        tags: ["Development", "React"],
+        is_offline: false,
+        link_url: "https://frontendmasters.com"
     }
 ];
 
@@ -46,7 +50,22 @@ const closeChatBtn = document.getElementById('close-chat');
 const chatInput = document.getElementById('chat-input');
 const sendChatBtn = document.getElementById('send-chat');
 const chatMessages = document.getElementById('chat-messages');
-const quickAddBtn = document.querySelector('button.bg-indigo-600'); // The Quick Add button
+const quickAddBtn = document.querySelector('button.bg-indigo-600'); 
+const addModal = document.getElementById('add-modal');
+const closeModalBtn = document.getElementById('close-modal');
+const addResourceForm = document.getElementById('add-resource-form');
+
+// New Modal Elements
+const resTypeSelect = document.getElementById('res-type');
+const customTypeContainer = document.getElementById('custom-type-container');
+const toggleUrlBtn = document.getElementById('toggle-url');
+const toggleFileBtn = document.getElementById('toggle-file');
+const urlInputContainer = document.getElementById('url-input-container');
+const fileInputContainer = document.getElementById('file-input-container');
+const resFileInput = document.getElementById('res-file');
+const fileNameDisplay = document.getElementById('file-name-display');
+
+let activeInputMode = 'url'; // 'url' or 'file'
 
 // Functions
 async function fetchResources() {
@@ -73,20 +92,70 @@ async function fetchResources() {
     }
 }
 
-async function handleQuickAdd() {
-    const title = prompt("Enter Resource Title:");
-    if (!title) return;
+function openModal() {
+    addModal.classList.add('active');
+}
+
+function closeModal() {
+    addModal.classList.remove('active');
+    addResourceForm.reset();
+    customTypeContainer.classList.add('hidden');
+    setInputMode('url');
+    fileNameDisplay.classList.add('hidden');
+}
+
+function setInputMode(mode) {
+    activeInputMode = mode;
+    if (mode === 'url') {
+        toggleUrlBtn.classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+        toggleUrlBtn.classList.remove('text-slate-500');
+        toggleFileBtn.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600');
+        toggleFileBtn.classList.add('text-slate-500');
+        urlInputContainer.classList.remove('hidden');
+        fileInputContainer.classList.add('hidden');
+    } else {
+        toggleFileBtn.classList.add('bg-white', 'shadow-sm', 'text-indigo-600');
+        toggleFileBtn.classList.remove('text-slate-500');
+        toggleUrlBtn.classList.remove('bg-white', 'shadow-sm', 'text-indigo-600');
+        toggleUrlBtn.classList.add('text-slate-500');
+        fileInputContainer.classList.remove('hidden');
+        urlInputContainer.classList.add('hidden');
+    }
+}
+
+async function handleFormSubmit(e) {
+    e.preventDefault();
     
-    const type = prompt("Enter Type (Book/Video):", "Book");
-    const author = prompt("Enter Author/Source:");
+    const title = document.getElementById('res-title').value;
+    let type = document.getElementById('res-type').value;
+    if (type === 'Other') {
+        type = document.getElementById('res-custom-type').value || 'Other';
+    }
+    
+    const author = document.getElementById('res-author').value;
+    const tagsInput = document.getElementById('res-tags').value;
+    const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()) : [];
+    
+    const isOffline = document.getElementById('res-offline').checked;
+    const url = document.getElementById('res-url').value;
+    const file = resFileInput.files[0];
     
     const newResource = {
         title,
         type,
         author,
         image: `https://picsum.photos/seed/${Math.random()}/400/300`,
-        tags: ["New"]
+        tags,
+        link_url: activeInputMode === 'url' ? url : null,
+        is_offline: activeInputMode === 'url' ? isOffline : true,
+        file_name: activeInputMode === 'file' ? file?.name : null
     };
+
+    const submitBtn = addResourceForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Saving...';
+    lucide.createIcons();
 
     if (supabaseClient) {
         try {
@@ -95,14 +164,23 @@ async function handleQuickAdd() {
                 .insert([newResource]);
             
             if (error) throw error;
-            fetchResources(); // Refresh list
+            await fetchResources();
+            closeModal();
         } catch (err) {
             alert("Error saving to Supabase. Check console.");
             console.error(err);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+            lucide.createIcons();
         }
     } else {
         resources.unshift({ id: Date.now(), ...newResource });
         renderResources();
+        closeModal();
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        lucide.createIcons();
     }
 }
 
@@ -143,12 +221,20 @@ function renderResources() {
                         <i data-lucide="bookmark" class="w-5 h-5"></i>
                     </button>
                 </div>
-                <div class="absolute top-3 left-3 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-[10px] font-bold text-slate-800 shadow-sm">
+                <div class="absolute top-3 left-3 px-2 py-1 bg-white/90 backdrop-blur rounded-lg text-[10px] font-bold text-slate-800 shadow-sm flex items-center gap-1">
+                    <i data-lucide="${res.is_offline ? 'hard-drive' : 'globe'}" class="w-3 h-3"></i>
                     ${res.type}
                 </div>
             </div>
             <div class="p-4">
-                <h3 class="font-bold text-slate-800 mb-1">${res.title}</h3>
+                <div class="flex items-start justify-between mb-1">
+                    <h3 class="font-bold text-slate-800 leading-tight">${res.title}</h3>
+                    ${res.link_url || res.file_name ? `
+                        <a href="${res.link_url || '#'}" target="_blank" class="text-indigo-600 hover:text-indigo-800">
+                            <i data-lucide="external-link" class="w-4 h-4"></i>
+                        </a>
+                    ` : ''}
+                </div>
                 <p class="text-xs text-slate-500 mb-3">${res.author || 'Unknown'}</p>
                 <div class="flex flex-wrap gap-1">
                     ${(res.tags || []).map(tag => `<span class="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full">${tag}</span>`).join('')}
@@ -198,7 +284,32 @@ function handleChat() {
 }
 
 // Event Listeners
-quickAddBtn.addEventListener('click', handleQuickAdd);
+resTypeSelect.addEventListener('change', (e) => {
+    if (e.target.value === 'Other') {
+        customTypeContainer.classList.remove('hidden');
+    } else {
+        customTypeContainer.classList.add('hidden');
+    }
+});
+
+toggleUrlBtn.addEventListener('click', () => setInputMode('url'));
+toggleFileBtn.addEventListener('click', () => setInputMode('file'));
+
+resFileInput.addEventListener('change', (e) => {
+    if (e.target.files.length > 0) {
+        fileNameDisplay.textContent = `Selected: ${e.target.files[0].name}`;
+        fileNameDisplay.classList.remove('hidden');
+    }
+});
+
+quickAddBtn.addEventListener('click', openModal);
+closeModalBtn.addEventListener('click', closeModal);
+addResourceForm.addEventListener('submit', handleFormSubmit);
+
+// Close modal on outside click
+addModal.addEventListener('click', (e) => {
+    if (e.target === addModal) closeModal();
+});
 
 closeChatBtn.addEventListener('click', () => {
     chatWidget.classList.add('translate-y-full', 'opacity-0', 'pointer-events-none');

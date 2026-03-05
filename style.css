@@ -55,3 +55,13 @@ nav a.active {
     opacity: 0;
     transition: opacity 0.3s ease;
 }
+
+/* Modal States */
+#add-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+#add-modal.active #modal-content {
+    transform: scale(1);
+}
