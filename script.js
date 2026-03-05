@@ -64,10 +64,36 @@ const urlInputContainer = document.getElementById('url-input-container');
 const fileInputContainer = document.getElementById('file-input-container');
 const resFileInput = document.getElementById('res-file');
 const fileNameDisplay = document.getElementById('file-name-display');
+const toastContainer = document.getElementById('toast-container');
 
 let activeInputMode = 'url'; // 'url' or 'file'
 
 // Functions
+function showToast(message, icon = 'info') {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.innerHTML = `
+        <i data-lucide="${icon}" class="w-4 h-4"></i>
+        <span>${message}</span>
+    `;
+    toastContainer.appendChild(toast);
+    lucide.createIcons();
+
+    setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+    }, 4000);
+}
+
+async function copyToClipboard(text) {
+    try {
+        await navigator.clipboard.writeText(text);
+        showToast("Path copied to clipboard!", "check-circle");
+    } catch (err) {
+        console.error('Failed to copy: ', err);
+    }
+}
+
 async function fetchResources() {
     if (!supabaseClient) {
         resources = MOCK_RESOURCES;
@@ -166,8 +192,9 @@ async function handleFormSubmit(e) {
             if (error) throw error;
             await fetchResources();
             closeModal();
+            showToast("Resource added successfully!", "check");
         } catch (err) {
-            alert("Error saving to Supabase. Check console.");
+            showToast("Error saving to Supabase", "alert-circle");
             console.error(err);
         } finally {
             submitBtn.disabled = false;
@@ -178,6 +205,7 @@ async function handleFormSubmit(e) {
         resources.unshift({ id: Date.now(), ...newResource });
         renderResources();
         closeModal();
+        showToast("Resource added locally", "check");
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
         lucide.createIcons();
@@ -215,37 +243,31 @@ function renderResources() {
         if (!url) return '#';
 
         if (res.is_offline) {
-            // Handle local file paths (e.g., C:/path or /Users/path)
-            // Prepend file:/// if it looks like a local path and doesn't have a protocol
+            // Handle local file paths
             if (!url.includes('://')) {
                 const cleanPath = url.replace(/\\/g, '/');
-                if (cleanPath.match(/^[a-zA-Z]:/)) {
-                    return `file:///${cleanPath}`;
-                }
-                if (cleanPath.startsWith('/')) {
-                    return `file://${cleanPath}`;
-                }
-                return `file:///${cleanPath}`;
+                if (cleanPath.match(/^[a-zA-Z]:/)) return `file:///${cleanPath}`;
+                return `file://${cleanPath.startsWith('/') ? '' : '/'}${cleanPath}`;
             }
             return url;
         } else {
-            // Ensure online URLs have a protocol to prevent relative redirection
-            if (!url.includes('://') && !url.startsWith('#')) {
-                return `https://${url}`;
-            }
+            if (!url.includes('://') && !url.startsWith('#')) return `https://${url}`;
             return url;
         }
     };
 
     resourceGallery.innerHTML = resources.map((res, index) => {
         const finalUrl = getFormattedUrl(res);
+        const clickHandler = res.is_offline 
+            ? `onclick="copyToClipboard('${finalUrl.replace(/'/g, "\\'")}'); return false;"` 
+            : '';
         
         return `
             <div class="resource-card group relative bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition-all animate-fade-in" style="animation-delay: ${index * 0.1}s">
                 <div class="aspect-video overflow-hidden relative">
                     <img src="${res.image}" alt="${res.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer">
                     <div class="resource-overlay absolute inset-0 bg-indigo-900/40 flex items-center justify-center gap-3">
-                        <a href="${finalUrl}" target="_blank" class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-600 hover:scale-110 transition-transform">
+                        <a href="${finalUrl}" target="_blank" ${clickHandler} class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-indigo-600 hover:scale-110 transition-transform">
                             <i data-lucide="${res.type === 'Video' ? 'play' : 'eye'}" class="w-5 h-5"></i>
                         </a>
                         <button class="w-10 h-10 bg-white rounded-full flex items-center justify-center text-slate-600 hover:scale-110 transition-transform">
@@ -261,8 +283,8 @@ function renderResources() {
                     <div class="flex items-start justify-between mb-1">
                         <h3 class="font-bold text-slate-800 leading-tight">${res.title}</h3>
                         ${res.link_url || res.file_name ? `
-                            <a href="${finalUrl}" target="_blank" class="text-indigo-600 hover:text-indigo-800" title="${res.is_offline ? 'Open Local File' : 'Open Link'}">
-                                <i data-lucide="${res.is_offline ? 'folder-open' : 'external-link'}" class="w-4 h-4"></i>
+                            <a href="${finalUrl}" target="_blank" ${clickHandler} class="text-indigo-600 hover:text-indigo-800" title="${res.is_offline ? 'Copy Local Path' : 'Open Link'}">
+                                <i data-lucide="${res.is_offline ? 'copy' : 'external-link'}" class="w-4 h-4"></i>
                             </a>
                         ` : ''}
                     </div>
