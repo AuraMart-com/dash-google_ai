@@ -55,6 +55,12 @@ const addModal = document.getElementById('add-modal');
 const closeModalBtn = document.getElementById('close-modal');
 const addResourceForm = document.getElementById('add-resource-form');
 
+// Viewer Elements
+const viewerModal = document.getElementById('viewer-modal');
+const closeViewerBtn = document.getElementById('close-viewer');
+const viewerContent = document.getElementById('viewer-content');
+const viewerTitle = document.getElementById('viewer-title');
+
 // New Modal Elements
 const resTypeSelect = document.getElementById('res-type');
 const customTypeContainer = document.getElementById('custom-type-container');
@@ -67,6 +73,7 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const toastContainer = document.getElementById('toast-container');
 
 let activeInputMode = 'url'; // 'url' or 'file'
+let currentObjectUrl = null;
 
 // Functions
 function showToast(message, icon = 'info') {
@@ -83,6 +90,56 @@ function showToast(message, icon = 'info') {
         toast.classList.add('fade-out');
         setTimeout(() => toast.remove(), 300);
     }, 4000);
+}
+
+function openViewer(file, title = "Local Resource") {
+    if (currentObjectUrl) {
+        URL.revokeObjectURL(currentObjectUrl);
+    }
+
+    currentObjectUrl = URL.createObjectURL(file);
+    viewerTitle.textContent = title || file.name;
+    
+    const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+    const isVideo = file.type.startsWith('video/');
+
+    if (isPdf) {
+        viewerContent.innerHTML = `<iframe src="${currentObjectUrl}" class="w-full h-full rounded-xl bg-white" frameborder="0"></iframe>`;
+    } else if (isVideo) {
+        viewerContent.innerHTML = `
+            <video controls class="max-w-full max-h-full rounded-xl shadow-2xl">
+                <source src="${currentObjectUrl}" type="${file.type}">
+                Your browser does not support the video tag.
+            </video>
+        `;
+    } else {
+        viewerContent.innerHTML = `
+            <div class="text-center text-white/60">
+                <i data-lucide="alert-circle" class="w-16 h-16 mx-auto mb-4"></i>
+                <p class="text-lg font-bold">Unsupported File Type</p>
+                <p class="text-sm mt-2">Please select a PDF or Video file.</p>
+                <a href="${currentObjectUrl}" download="${file.name}" class="mt-6 inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">
+                    <i data-lucide="download" class="w-4 h-4"></i>
+                    Download File
+                </a>
+            </div>
+        `;
+        lucide.createIcons();
+    }
+
+    viewerModal.classList.add('active');
+    showToast("Opening local file viewer...", "eye");
+}
+
+function closeViewer() {
+    viewerModal.classList.remove('active');
+    setTimeout(() => {
+        viewerContent.innerHTML = '';
+        if (currentObjectUrl) {
+            URL.revokeObjectURL(currentObjectUrl);
+            currentObjectUrl = null;
+        }
+    }, 300);
 }
 
 async function copyToClipboard(text) {
@@ -233,7 +290,18 @@ function renderNews() {
 
 function renderResources() {
     if (resources.length === 0) {
-        resourceGallery.innerHTML = '<p class="col-span-2 text-center text-slate-400 py-10">No resources found. Click Quick Add to start!</p>';
+        resourceGallery.innerHTML = `
+            <div id="drop-zone" class="resource-card group relative bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl flex flex-col items-center justify-center p-8 text-center hover:border-indigo-400 hover:bg-indigo-100/50 transition-all cursor-pointer">
+                <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-sm mb-3">
+                    <i data-lucide="file-plus" class="w-6 h-6"></i>
+                </div>
+                <h3 class="text-sm font-bold text-indigo-900">Drop to View</h3>
+                <p class="text-[10px] text-indigo-500 mt-1">Select any local PDF or Video to view it instantly</p>
+                <input type="file" id="drop-zone-input" class="hidden" accept="application/pdf,video/*">
+            </div>
+            <p class="col-span-1 text-center text-slate-400 py-10 flex items-center justify-center">No resources found. Click Quick Add to start!</p>
+        `;
+        setupDropZone();
         return;
     }
 
@@ -256,10 +324,21 @@ function renderResources() {
         }
     };
 
-    resourceGallery.innerHTML = resources.map((res, index) => {
+    const dropZoneHtml = `
+        <div id="drop-zone" class="resource-card group relative bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl flex flex-col items-center justify-center p-8 text-center hover:border-indigo-400 hover:bg-indigo-100/50 transition-all cursor-pointer">
+            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-sm mb-3">
+                <i data-lucide="file-plus" class="w-6 h-6"></i>
+            </div>
+            <h3 class="text-sm font-bold text-indigo-900">Drop to View</h3>
+            <p class="text-[10px] text-indigo-500 mt-1">Select any local PDF or Video</p>
+            <input type="file" id="drop-zone-input" class="hidden" accept="application/pdf,video/*">
+        </div>
+    `;
+
+    resourceGallery.innerHTML = dropZoneHtml + resources.map((res, index) => {
         const finalUrl = getFormattedUrl(res);
         const clickHandler = res.is_offline 
-            ? `onclick="copyToClipboard('${finalUrl.replace(/'/g, "\\'")}'); return false;"` 
+            ? `onclick="handleOfflineClick(event, '${res.title.replace(/'/g, "\\'")}', '${finalUrl.replace(/'/g, "\\'")}')"` 
             : '';
         
         return `
@@ -283,7 +362,7 @@ function renderResources() {
                     <div class="flex items-start justify-between mb-1">
                         <h3 class="font-bold text-slate-800 leading-tight">${res.title}</h3>
                         ${res.link_url || res.file_name ? `
-                            <a href="${finalUrl}" target="_blank" ${clickHandler} class="text-indigo-600 hover:text-indigo-800" title="${res.is_offline ? 'Copy Local Path' : 'Open Link'}">
+                            <a href="${finalUrl}" target="_blank" ${clickHandler} class="text-indigo-600 hover:text-indigo-800" title="${res.is_offline ? 'Open Local File' : 'Open Link'}">
                                 <i data-lucide="${res.is_offline ? 'copy' : 'external-link'}" class="w-4 h-4"></i>
                             </a>
                         ` : ''}
@@ -296,7 +375,59 @@ function renderResources() {
             </div>
         `;
     }).join('');
+    
+    setupDropZone();
     lucide.createIcons();
+}
+
+function handleOfflineClick(e, title, path) {
+    e.preventDefault();
+    
+    // Create a hidden file input to let user select the file
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/pdf,video/*';
+    
+    showToast(`Please select the file: ${title}`, "file-search");
+    
+    input.onchange = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            openViewer(file, title);
+        }
+    };
+    
+    input.click();
+}
+
+function setupDropZone() {
+    const dz = document.getElementById('drop-zone');
+    const dzi = document.getElementById('drop-zone-input');
+
+    if (!dz || !dzi) return;
+
+    dz.addEventListener('click', () => dzi.click());
+
+    dz.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dz.classList.add('border-indigo-500', 'bg-indigo-100');
+    });
+
+    dz.addEventListener('dragleave', () => {
+        dz.classList.remove('border-indigo-500', 'bg-indigo-100');
+    });
+
+    dz.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dz.classList.remove('border-indigo-500', 'bg-indigo-100');
+        const file = e.dataTransfer.files[0];
+        if (file) openViewer(file);
+    });
+
+    dzi.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (file) openViewer(file);
+    });
 }
 
 function addMessage(text, isUser = false) {
@@ -370,6 +501,8 @@ closeChatBtn.addEventListener('click', () => {
     openChatBtn.classList.remove('scale-0', 'opacity-0');
     openChatBtn.classList.add('scale-100', 'opacity-100');
 });
+
+closeViewerBtn.addEventListener('click', closeViewer);
 
 openChatBtn.addEventListener('click', () => {
     chatWidget.classList.remove('translate-y-full', 'opacity-0', 'pointer-events-none');

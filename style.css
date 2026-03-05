@@ -66,6 +66,11 @@ nav a.active {
     transform: scale(1);
 }
 
+#viewer-modal.active {
+    opacity: 1;
+    pointer-events: auto;
+}
+
 /* Toast Notification */
 #toast-container {
     fixed: fixed;

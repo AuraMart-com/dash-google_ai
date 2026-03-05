@@ -108,7 +108,7 @@
                             </div>
                         </div>
                         <div id="resource-gallery" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <!-- Resource cards will be injected here -->
+                            <!-- Resource cards and Drop Zone will be injected here -->
                         </div>
                     </section>
 
@@ -268,6 +268,28 @@
                         </button>
                     </div>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Viewer Modal -->
+    <div id="viewer-modal" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[200] flex flex-col opacity-0 pointer-events-none transition-all duration-300">
+        <div class="h-16 bg-white/10 border-b border-white/10 flex items-center justify-between px-6 shrink-0">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                </div>
+                <h3 id="viewer-title" class="text-white font-bold truncate max-w-md">Local File Viewer</h3>
+            </div>
+            <button id="close-viewer" class="p-2 hover:bg-white/10 rounded-xl transition-colors text-white/60 hover:text-white">
+                <i data-lucide="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        <div id="viewer-content" class="flex-1 flex items-center justify-center overflow-hidden p-4">
+            <!-- Content injected here (iframe or video) -->
+            <div class="text-center text-white/40">
+                <i data-lucide="loader-2" class="w-12 h-12 animate-spin mx-auto mb-4"></i>
+                <p>Loading your resource...</p>
             </div>
         </div>
     </div>
