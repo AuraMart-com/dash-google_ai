@@ -235,6 +235,23 @@
             <i data-lucide="message-square" class="w-6 h-6"></i>
         </button>
 
+        <!-- Delete Confirmation Modal -->
+        <div id="delete-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+            <div class="bg-[#1e293b] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 border border-slate-800" id="delete-modal-content">
+                <div class="p-6 text-center">
+                    <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i data-lucide="trash-2" class="w-8 h-8 text-red-500"></i>
+                    </div>
+                    <h3 class="text-lg font-bold text-white mb-2">Confirm Delete</h3>
+                    <p class="text-sm text-slate-400 mb-6">Are you sure you want to delete <span id="delete-item-name" class="font-bold text-slate-200"></span>? This action cannot be undone.</p>
+                    <div class="flex gap-3">
+                        <button onclick="closeDeleteModal()" class="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-700 transition-all">Cancel</button>
+                        <button id="confirm-delete-btn" class="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all shadow-lg shadow-red-900/20">Delete</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- News Modal -->
         <div id="news-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
             <div class="bg-[#1e293b] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 border border-slate-800" id="news-modal-content">
@@ -259,7 +276,7 @@
         <div id="add-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
             <div class="bg-[#1e293b] w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 border border-slate-800" id="modal-content">
                 <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-indigo-900/10">
-                    <h3 class="text-lg font-bold text-white">Add New Resource</h3>
+                    <h3 class="text-lg font-bold text-white" id="modal-title">Add New Resource</h3>
                     <button onclick="closeModal()" class="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white">
                         <i data-lucide="x" class="w-5 h-5"></i>
                     </button>
@@ -322,9 +339,9 @@
                         <input type="text" id="res-tags" placeholder="e.g. Productivity, Science" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-200">
                     </div>
                     <div class="pt-4">
-                        <button type="submit" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2">
+                        <button type="submit" id="submit-resource-btn" class="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20 flex items-center justify-center gap-2">
                             <i data-lucide="check" class="w-4 h-4"></i>
-                            Save Resource
+                            <span id="submit-btn-text">Save Resource</span>
                         </button>
                     </div>
                 </form>

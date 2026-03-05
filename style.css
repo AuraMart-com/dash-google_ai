@@ -73,13 +73,31 @@ nav a.active {
 }
 
 /* Modal States */
-#add-modal.active, #folder-modal.active, #move-modal.active, #news-modal.active {
+#add-modal.active, #folder-modal.active, #move-modal.active, #news-modal.active, #delete-modal.active {
     opacity: 1;
     pointer-events: auto;
 }
 
-#add-modal.active #modal-content, #folder-modal.active #folder-modal-content, #move-modal.active #move-modal-content, #news-modal.active #news-modal-content {
+#add-modal.active #modal-content, #folder-modal.active #folder-modal-content, #move-modal.active #move-modal-content, #news-modal.active #news-modal-content, #delete-modal.active #delete-modal-content {
     transform: scale(1);
+}
+
+/* Tree Styles */
+.tree-node {
+    margin-left: 1.5rem;
+    display: none;
+}
+
+.tree-node.expanded {
+    display: block;
+}
+
+.tree-toggle {
+    transition: transform 0.2s;
+}
+
+.tree-toggle.expanded {
+    transform: rotate(90deg);
 }
 
 /* Context Menu */

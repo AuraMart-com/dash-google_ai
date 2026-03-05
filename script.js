@@ -36,6 +36,7 @@ const addModal = document.getElementById('add-modal');
 const folderModal = document.getElementById('folder-modal');
 const moveModal = document.getElementById('move-modal');
 const newsModal = document.getElementById('news-modal');
+const deleteModal = document.getElementById('delete-modal');
 const addResourceForm = document.getElementById('add-resource-form');
 const addFolderForm = document.getElementById('add-folder-form');
 
@@ -86,9 +87,12 @@ function openModal() {
 function closeModal() {
     addModal.classList.remove('active');
     addResourceForm.reset();
+    document.getElementById('modal-title').textContent = 'Add New Resource';
+    document.getElementById('submit-btn-text').textContent = 'Save Resource';
     customTypeContainer.classList.add('hidden');
     setInputMode('url');
     fileNameDisplay.classList.add('hidden');
+    contextMenuItem = null;
 }
 
 function openFolderModal() {
@@ -133,6 +137,17 @@ function openNewsModal() {
 
 function closeNewsModal() {
     newsModal.classList.remove('active');
+}
+
+function openDeleteModal(item) {
+    contextMenuItem = item;
+    document.getElementById('delete-item-name').textContent = item.name || item.title;
+    deleteModal.classList.add('active');
+}
+
+function closeDeleteModal() {
+    deleteModal.classList.remove('active');
+    contextMenuItem = null;
 }
 
 function copyOfflinePath() {
@@ -340,20 +355,12 @@ function hideContextMenu() {
 // Actions
 async function deleteItem() {
     if (!contextMenuItem) return;
-    const { id, itemType, name, title } = contextMenuItem;
-    const label = name || title;
-
-    if (!confirm(`Are you sure you want to delete "${label}"?`)) return;
+    const { id, itemType } = contextMenuItem;
 
     try {
         const table = itemType === 'folder' ? 'folders' : 'resources';
-        console.log(`Deleting ${itemType} with ID: ${id} from table: ${table}`);
-        
         const { error } = await supabaseClient.from(table).delete().eq('id', id);
-        if (error) {
-            console.error("Supabase delete error:", error);
-            throw error;
-        }
+        if (error) throw error;
         
         showToast(`Deleted ${itemType}`, "trash-2");
         fetchResources();
@@ -361,7 +368,7 @@ async function deleteItem() {
         console.error("Delete operation failed:", err);
         showToast(`Delete failed: ${err.message || 'Unknown error'}`, "alert-circle");
     } finally {
-        hideContextMenu();
+        closeDeleteModal();
     }
 }
 
@@ -374,33 +381,64 @@ async function renderFolderListForMove() {
         if (error) throw error;
 
         listContainer.innerHTML = `
-            <button onclick="selectFolderForMove(null)" class="w-full text-left px-4 py-3 rounded-xl border border-slate-800 hover:border-indigo-500 transition-all flex items-center gap-3 bg-slate-900/50">
+            <button onclick="selectFolderForMove(null)" class="w-full text-left px-4 py-3 rounded-xl border border-slate-800 hover:border-indigo-500 transition-all flex items-center gap-3 bg-slate-900/50 mb-2">
                 <i data-lucide="home" class="w-4 h-4 text-slate-500"></i>
                 <span class="text-sm text-slate-300">Root Directory</span>
             </button>
         `;
 
-        const buildTree = (parentId, depth = 0) => {
+        const buildTree = (parentId, container) => {
             const children = (allFolders || []).filter(f => f.parent_id === parentId);
             children.forEach(f => {
-                // Don't allow moving a folder into itself
                 if (contextMenuItem.itemType === 'folder' && f.id === contextMenuItem.id) return;
                 
+                const itemWrapper = document.createElement('div');
+                itemWrapper.className = 'mb-1';
+                
+                const btnWrapper = document.createElement('div');
+                btnWrapper.className = 'flex items-center gap-1';
+                
+                const hasChildren = allFolders.some(child => child.parent_id === f.id);
+                
+                if (hasChildren) {
+                    const toggle = document.createElement('button');
+                    toggle.className = 'p-1 hover:bg-slate-800 rounded text-slate-500 tree-toggle';
+                    toggle.innerHTML = '<i data-lucide="chevron-right" class="w-4 h-4"></i>';
+                    toggle.onclick = (e) => {
+                        e.stopPropagation();
+                        const childContainer = itemWrapper.querySelector('.tree-node');
+                        childContainer.classList.toggle('expanded');
+                        toggle.classList.toggle('expanded');
+                    };
+                    btnWrapper.appendChild(toggle);
+                } else {
+                    const spacer = document.createElement('div');
+                    spacer.className = 'w-6';
+                    btnWrapper.appendChild(spacer);
+                }
+
                 const btn = document.createElement('button');
                 btn.onclick = () => selectFolderForMove(f.id);
-                btn.className = 'w-full text-left px-4 py-3 rounded-xl border border-slate-800 hover:border-indigo-500 transition-all flex items-center gap-3 bg-slate-900/50';
-                btn.style.marginLeft = `${depth * 1.5}rem`;
+                btn.className = 'flex-1 text-left px-4 py-2 rounded-xl border border-slate-800 hover:border-indigo-500 transition-all flex items-center gap-3 bg-slate-900/50';
                 btn.innerHTML = `
                     <i data-lucide="folder" class="w-4 h-4 text-indigo-400"></i>
                     <span class="text-sm text-slate-300">${f.name}</span>
                 `;
-                listContainer.appendChild(btn);
+                btnWrapper.appendChild(btn);
+                itemWrapper.appendChild(btnWrapper);
                 
-                buildTree(f.id, depth + 1);
+                if (hasChildren) {
+                    const childContainer = document.createElement('div');
+                    childContainer.className = 'tree-node';
+                    buildTree(f.id, childContainer);
+                    itemWrapper.appendChild(childContainer);
+                }
+                
+                container.appendChild(itemWrapper);
             });
         };
 
-        buildTree(null);
+        buildTree(null, listContainer);
         lucide.createIcons();
     } catch (err) {
         console.error("Error rendering folder tree:", err);
@@ -474,11 +512,21 @@ async function handleResourceSubmit(e) {
     }
 
     try {
-        const { error } = await supabaseClient.from('resources').insert([{
-            title, type, author, tags, link_url: finalUrl, is_offline: isOffline, folder_id: currentFolderId
-        }]);
+        let error;
+        if (contextMenuItem && contextMenuItem.id) {
+            // Update existing
+            ({ error } = await supabaseClient.from('resources').update({
+                title, type, author, tags, link_url: finalUrl, is_offline: isOffline
+            }).eq('id', contextMenuItem.id));
+        } else {
+            // Insert new
+            ({ error } = await supabaseClient.from('resources').insert([{
+                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, folder_id: currentFolderId
+            }]));
+        }
+        
         if (error) throw error;
-        showToast("Resource added!", "check");
+        showToast(contextMenuItem ? "Resource updated!" : "Resource added!", "check");
         closeModal();
         fetchResources();
     } catch (err) {
@@ -573,30 +621,56 @@ resFileInput.addEventListener('change', (e) => {
 addResourceForm.addEventListener('submit', handleResourceSubmit);
 addFolderForm.addEventListener('submit', handleFolderSubmit);
 document.getElementById('confirm-move-btn').addEventListener('click', confirmMove);
+document.getElementById('confirm-delete-btn').addEventListener('click', deleteItem);
 
-document.getElementById('ctx-delete').addEventListener('click', deleteItem);
+document.getElementById('ctx-delete').addEventListener('click', () => {
+    hideContextMenu();
+    openDeleteModal(contextMenuItem);
+});
 document.getElementById('ctx-move').addEventListener('click', () => {
     hideContextMenu();
     openMoveModal(contextMenuItem);
 });
 document.getElementById('ctx-edit').addEventListener('click', async () => {
     if (!contextMenuItem) return;
-    const { id, itemType, name, title } = contextMenuItem;
-    const oldName = name || title;
-    const newName = prompt(`Rename "${oldName}" to:`, oldName);
     
-    if (newName && newName !== oldName) {
-        try {
-            const table = itemType === 'folder' ? 'folders' : 'resources';
-            const column = itemType === 'folder' ? 'name' : 'title';
-            const { error } = await supabaseClient.from(table).update({ [column]: newName }).eq('id', id);
-            if (error) throw error;
-            showToast("Renamed successfully", "edit-3");
-            fetchResources();
-        } catch (err) {
-            console.error(err);
-            showToast("Rename failed", "alert-circle");
+    if (contextMenuItem.itemType === 'folder') {
+        const oldName = contextMenuItem.name;
+        const newName = prompt(`Rename folder "${oldName}" to:`, oldName);
+        if (newName && newName !== oldName) {
+            try {
+                const { error } = await supabaseClient.from('folders').update({ name: newName }).eq('id', contextMenuItem.id);
+                if (error) throw error;
+                showToast("Folder renamed", "edit-3");
+                fetchResources();
+            } catch (err) {
+                console.error(err);
+                showToast("Rename failed", "alert-circle");
+            }
         }
+    } else {
+        // Full edit for resource
+        document.getElementById('modal-title').textContent = 'Edit Resource';
+        document.getElementById('submit-btn-text').textContent = 'Update Resource';
+        
+        document.getElementById('res-title').value = contextMenuItem.title;
+        document.getElementById('res-author').value = contextMenuItem.author || '';
+        document.getElementById('res-tags').value = (contextMenuItem.tags || []).join(', ');
+        document.getElementById('res-offline').checked = contextMenuItem.is_offline;
+        document.getElementById('res-url').value = contextMenuItem.link_url || '';
+        
+        const typeSelect = document.getElementById('res-type');
+        const standardTypes = ['Book', 'Video', 'Website', 'PDF'];
+        if (standardTypes.includes(contextMenuItem.type)) {
+            typeSelect.value = contextMenuItem.type;
+            customTypeContainer.classList.add('hidden');
+        } else {
+            typeSelect.value = 'Other';
+            customTypeContainer.classList.remove('hidden');
+            document.getElementById('res-custom-type').value = contextMenuItem.type;
+        }
+        
+        openModal();
     }
     hideContextMenu();
 });
@@ -645,4 +719,5 @@ window.openFolderModal = openFolderModal;
 window.closeFolderModal = closeFolderModal;
 window.closeMoveModal = closeMoveModal;
 window.closeNewsModal = closeNewsModal;
+window.closeDeleteModal = closeDeleteModal;
 window.selectFolderForMove = selectFolderForMove;
