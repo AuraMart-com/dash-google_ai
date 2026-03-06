@@ -100,6 +100,25 @@ nav a.active {
     transform: rotate(90deg);
 }
 
+/* Google Drive Viewer */
+#drive-viewer-modal.flex {
+    display: flex;
+}
+
+#drive-iframe {
+    background: #000;
+}
+
+/* Chat Bouncing Animation */
+@keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+.animate-bounce {
+    animation: bounce 0.6s infinite;
+}
+
 /* Context Menu */
 .context-menu {
     position: fixed;

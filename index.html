@@ -235,6 +235,38 @@
             <i data-lucide="message-square" class="w-6 h-6"></i>
         </button>
 
+        <!-- Google Drive Viewer Modal -->
+        <div id="drive-viewer-modal" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[300] hidden flex-col animate-in fade-in duration-300">
+            <div class="h-16 bg-[#1e293b] border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-indigo-600/20 rounded-xl flex items-center justify-center text-indigo-400">
+                        <i data-lucide="file-text" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 id="viewer-title" class="text-sm font-bold text-white truncate max-w-md">Document Viewer</h3>
+                        <p class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Google Drive Integration</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <button id="viewer-external" class="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white" title="Open in New Tab">
+                        <i data-lucide="external-link" class="w-5 h-5"></i>
+                    </button>
+                    <button onclick="closeDriveViewer()" class="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-xl transition-colors text-red-400" title="Close Viewer">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 bg-black relative">
+                <iframe id="drive-iframe" class="w-full h-full border-none" allow="autoplay"></iframe>
+                <div id="viewer-loader" class="absolute inset-0 flex items-center justify-center bg-slate-900">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+                        <p class="text-xs text-slate-400 font-medium">Loading Document...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Delete Confirmation Modal -->
         <div id="delete-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
             <div class="bg-[#1e293b] w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 border border-slate-800" id="delete-modal-content">
@@ -315,11 +347,17 @@
                         </div>
                         
                         <div id="url-input-container" class="space-y-3">
-                            <div class="flex items-center gap-2">
-                                <input type="checkbox" id="res-offline" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
-                                <label for="res-offline" class="text-xs text-slate-400 font-medium">This is an offline/local resource</label>
+                            <div class="flex items-center gap-4">
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="res-offline" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="res-offline" class="text-xs text-slate-400 font-medium">Offline/Local</label>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <input type="checkbox" id="res-google-drive" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+                                    <label for="res-google-drive" class="text-xs text-slate-400 font-medium">Google Drive Link</label>
+                                </div>
                             </div>
-                            <input type="text" id="res-url" placeholder="https://example.com or D:/books/study.pdf" class="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-200">
+                            <input type="text" id="res-url" placeholder="https://drive.google.com/... or D:/books/..." class="w-full px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-200">
                             <p class="text-[10px] text-slate-500 italic">Note: Browsers may block local file links for security. You might need to right-click and "Copy link address" to open manually.</p>
                         </div>
                         
@@ -419,6 +457,6 @@
     <!-- Toast Container -->
     <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
 
-    <script src="script.js"></script>
+    <script type="module" src="script.js"></script>
 </body>
 </html>

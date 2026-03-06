@@ -1,6 +1,10 @@
 // Initialize Lucide Icons
 lucide.createIcons();
 
+// Gemini API Integration
+import { GoogleGenAI } from "@google/genai";
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
 // Supabase Configuration
 const SUPABASE_URL = 'https://arqkzpnqfceqzrymzrnf.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFycWt6cG5xZmNlcXpyeW16cm5mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI2OTI1MzgsImV4cCI6MjA4ODI2ODUzOH0.XIBiWsg1oUcvlxmPXacA5pRWmDL6CgWku3r6CbDuk8Y';
@@ -51,6 +55,12 @@ const fileNameDisplay = document.getElementById('file-name-display');
 const toastContainer = document.getElementById('toast-container');
 const breadcrumbsContainer = document.getElementById('breadcrumbs');
 const contextMenu = document.getElementById('context-menu');
+
+const driveViewerModal = document.getElementById('drive-viewer-modal');
+const driveIframe = document.getElementById('drive-iframe');
+const viewerTitle = document.getElementById('viewer-title');
+const viewerLoader = document.getElementById('viewer-loader');
+const viewerExternal = document.getElementById('viewer-external');
 
 // Functions
 function showToast(message, icon = 'info') {
@@ -137,6 +147,38 @@ function openNewsModal() {
 
 function closeNewsModal() {
     newsModal.classList.remove('active');
+}
+
+function openDriveViewer(url, title) {
+    viewerTitle.textContent = title;
+    viewerLoader.style.display = 'flex';
+    driveViewerModal.classList.remove('hidden');
+    driveViewerModal.classList.add('flex');
+    
+    // Convert view URL to preview URL for embedding
+    let previewUrl = url;
+    if (url.includes('drive.google.com')) {
+        if (url.includes('/view')) {
+            previewUrl = url.replace('/view', '/preview');
+        } else if (!url.includes('/preview')) {
+            // Try to append preview if it's a direct link
+            if (url.endsWith('/')) previewUrl += 'preview';
+            else previewUrl += '/preview';
+        }
+    }
+    
+    driveIframe.src = previewUrl;
+    viewerExternal.onclick = () => window.open(url, '_blank');
+    
+    driveIframe.onload = () => {
+        viewerLoader.style.display = 'none';
+    };
+}
+
+function closeDriveViewer() {
+    driveViewerModal.classList.add('hidden');
+    driveViewerModal.classList.remove('flex');
+    driveIframe.src = '';
 }
 
 function openDeleteModal(item) {
@@ -256,6 +298,7 @@ function renderResources() {
         const icon = getResourceIcon(res.type);
         const displayUrl = res.link_url || '#';
         const isOffline = res.is_offline;
+        const isGoogleDrive = res.is_google_drive;
         
         resEl.innerHTML = `
             <div class="flex items-start gap-4">
@@ -272,8 +315,8 @@ function renderResources() {
                     <p class="text-xs text-slate-500 truncate mb-2">${res.author || 'Unknown'}</p>
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
-                            <i data-lucide="${isOffline ? 'hard-drive' : 'external-link'}" class="w-3 h-3"></i>
-                            ${isOffline ? 'View Path' : 'Open'}
+                            <i data-lucide="${isOffline ? 'hard-drive' : (isGoogleDrive ? 'file-text' : 'external-link')}" class="w-3 h-3"></i>
+                            ${isOffline ? 'View Path' : (isGoogleDrive ? 'View in App' : 'Open')}
                         </span>
                         <span class="text-[10px] text-slate-600">•</span>
                         <span class="text-[10px] text-slate-500">${res.type}</span>
@@ -289,6 +332,8 @@ function renderResources() {
             } else {
                 if (isOffline) {
                     openOfflineModal(res.link_url);
+                } else if (isGoogleDrive) {
+                    openDriveViewer(res.link_url, res.title);
                 } else {
                     window.open(displayUrl, '_blank');
                 }
@@ -484,6 +529,7 @@ async function handleResourceSubmit(e) {
     const author = document.getElementById('res-author').value;
     const tags = document.getElementById('res-tags').value.split(',').map(t => t.trim()).filter(t => t);
     const isOffline = document.getElementById('res-offline').checked;
+    const isGoogleDrive = document.getElementById('res-google-drive').checked;
     const url = document.getElementById('res-url').value;
     const file = resFileInput.files[0];
 
@@ -516,12 +562,12 @@ async function handleResourceSubmit(e) {
         if (contextMenuItem && contextMenuItem.id) {
             // Update existing
             ({ error } = await supabaseClient.from('resources').update({
-                title, type, author, tags, link_url: finalUrl, is_offline: isOffline
+                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive
             }).eq('id', contextMenuItem.id));
         } else {
             // Insert new
             ({ error } = await supabaseClient.from('resources').insert([{
-                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, folder_id: currentFolderId
+                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive, folder_id: currentFolderId
             }]));
         }
         
@@ -575,14 +621,75 @@ function addMessage(text, isUser = false) {
     lucide.createIcons();
 }
 
-function handleChat() {
+async function handleChat() {
     const text = chatInput.value.trim();
     if (!text) return;
+    
     addMessage(text, true);
     chatInput.value = '';
-    setTimeout(() => {
-        addMessage("I'm here to help! I can analyze your resources or help you organize your folders.");
-    }, 1000);
+    
+    // Create a placeholder for the bot response
+    const botMsgDiv = document.createElement('div');
+    botMsgDiv.className = `flex gap-2 animate-fade-in`;
+    botMsgDiv.innerHTML = `
+        <div class="w-8 h-8 rounded-lg bg-indigo-900/50 flex items-center justify-center shrink-0">
+            <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i>
+        </div>
+        <div class="bg-[#1e293b] text-slate-300 rounded-2xl rounded-tl-none border border-slate-800 p-3 text-sm shadow-sm max-w-[80%] bot-content">
+            <div class="flex items-center gap-2">
+                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
+                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
+                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+            </div>
+        </div>
+    `;
+    chatMessages.appendChild(botMsgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+    lucide.createIcons();
+
+    const botContent = botMsgDiv.querySelector('.bot-content');
+
+    try {
+        // Fetch ALL resources and folders for context
+        const { data: allRes } = await supabaseClient.from('resources').select('*');
+        const { data: allFolders } = await supabaseClient.from('folders').select('*');
+        
+        const context = `
+            You are a helpful Study Assistant for StudyHub. 
+            You have access to the user's study resources and folders.
+            
+            Current Resources:
+            ${(allRes || []).map(r => `- ${r.title} (${r.type}) by ${r.author || 'Unknown'}. Tags: ${(r.tags || []).join(', ')}`).join('\n')}
+            
+            Current Folders:
+            ${(allFolders || []).map(f => `- ${f.name}: ${f.description || 'No description'}`).join('\n')}
+            
+            Answer the user's questions based on these resources. If they ask about a specific book or video, check if it exists in their library.
+            Be concise and professional.
+        `;
+
+        const response = await ai.models.generateContentStream({
+            model: "gemini-3-flash-preview",
+            contents: [{ role: 'user', parts: [{ text }] }],
+            config: {
+                systemInstruction: context
+            }
+        });
+
+        botContent.innerHTML = '';
+        let fullText = '';
+        
+        for await (const chunk of response) {
+            const chunkText = chunk.text;
+            fullText += chunkText;
+            // Simple markdown-ish bolding for better readability
+            botContent.innerHTML = fullText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    } catch (err) {
+        console.error("Gemini Error:", err);
+        botContent.innerHTML = "Sorry, I encountered an error while processing your request. Please check your connection and try again.";
+    }
 }
 
 // Event Listeners
@@ -657,6 +764,7 @@ document.getElementById('ctx-edit').addEventListener('click', async () => {
         document.getElementById('res-author').value = contextMenuItem.author || '';
         document.getElementById('res-tags').value = (contextMenuItem.tags || []).join(', ');
         document.getElementById('res-offline').checked = contextMenuItem.is_offline;
+        document.getElementById('res-google-drive').checked = contextMenuItem.is_google_drive || false;
         document.getElementById('res-url').value = contextMenuItem.link_url || '';
         
         const typeSelect = document.getElementById('res-type');
@@ -715,9 +823,13 @@ fetchResources();
 // Expose navigation to window for breadcrumbs
 window.navigateToFolder = navigateToFolder;
 window.openModal = openModal;
+window.closeModal = closeModal;
 window.openFolderModal = openFolderModal;
 window.closeFolderModal = closeFolderModal;
 window.closeMoveModal = closeMoveModal;
 window.closeNewsModal = closeNewsModal;
 window.closeDeleteModal = closeDeleteModal;
+window.closeDriveViewer = closeDriveViewer;
+window.closeOfflineModal = closeOfflineModal;
+window.copyOfflinePath = copyOfflinePath;
 window.selectFolderForMove = selectFolderForMove;
