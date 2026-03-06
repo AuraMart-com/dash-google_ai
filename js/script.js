@@ -3,7 +3,14 @@ lucide.createIcons();
 
 // Gemini API Integration
 import { GoogleGenAI } from "@google/genai";
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+
+// For static hosting, we'll try to get the key from process.env (Vite/Build) 
+// or fallback to a placeholder that the user can fill.
+const GEMINI_API_KEY = typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY 
+    ? process.env.GEMINI_API_KEY 
+    : 'YOUR_GEMINI_API_KEY_HERE';
+
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://arqkzpnqfceqzrymzrnf.supabase.co';
