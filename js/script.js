@@ -4,18 +4,22 @@ lucide.createIcons();
 // Gemini API Integration
 import { GoogleGenAI } from "@google/genai";
 
-// Vite will replace process.env.GEMINI_API_KEY with the actual key during build/dev
-let GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY_HERE';
-try {
-    // This string is replaced by Vite during build
-    const envKey = process.env.GEMINI_API_KEY;
-    if (envKey && envKey !== 'undefined') {
-        GEMINI_API_KEY = envKey;
-    }
-} catch (e) {
-    // process is not defined in browser
-}
+// Fallback for environment variables in static hosting
+const getEnv = (key) => {
+    try {
+        // Try Vite's import.meta.env first
+        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
+            return import.meta.env[key];
+        }
+        // Try process.env (for some build tools)
+        if (typeof process !== 'undefined' && process.env && process.env[key]) {
+            return process.env[key];
+        }
+    } catch (e) {}
+    return null;
+};
 
+const GEMINI_API_KEY = getEnv('VITE_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY') || 'YOUR_GEMINI_API_KEY_HERE';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Supabase Configuration
@@ -24,8 +28,12 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 
 try {
-    supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    console.log("Supabase initialized successfully");
+    if (typeof supabase !== 'undefined') {
+        supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log("Supabase initialized successfully");
+    } else {
+        console.warn("Supabase library not found, running in local-only mode");
+    }
 } catch (e) {
     console.error("Supabase initialization failed", e);
 }
@@ -171,7 +179,7 @@ function closeNewsModal() {
     newsModal.classList.remove('active');
 }
 
-const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY;
+const NEWS_API_KEY = getEnv('VITE_NEWS_API_KEY') || getEnv('NEWS_API_KEY');
 
 async function fetchNews() {
     const newsFeed = document.getElementById('news-feed');
@@ -190,7 +198,7 @@ async function fetchNews() {
                     <i data-lucide="key" class="w-8 h-8 text-amber-500"></i>
                 </div>
                 <h3 class="text-lg font-bold text-slate-200">API Key Required</h3>
-                <p class="text-slate-500 text-sm max-w-xs">Please set <code class="bg-slate-800 px-1 rounded text-indigo-400">VITE_NEWS_API_KEY</code> in your environment variables to see real-time news.</p>
+                <p class="text-slate-500 text-sm max-w-xs">Please set <code class="bg-slate-800 px-1 rounded text-indigo-400">VITE_NEWS_API_KEY</code> to see real-time news. On GitHub Pages, you may need to hardcode this temporarily or use a build tool.</p>
             </div>
         `;
         lucide.createIcons();
@@ -205,7 +213,14 @@ async function fetchNews() {
     else if (currentNewsFilter === 'jobs') query = '"tech jobs"';
     else if (currentNewsFilter === 'tech') query = 'technology';
 
-    const url = `/api/news?q=${encodeURIComponent(query)}`;
+    // Use proxy in development/production server, direct call for static hosting (GitHub Pages)
+    const isStaticHost = window.location.hostname.includes('github.io') || 
+                        window.location.hostname.includes('github.com') || 
+                        window.location.protocol === 'file:';
+    
+    const url = isStaticHost 
+        ? `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=15&apikey=${NEWS_API_KEY}`
+        : `/api/news?q=${encodeURIComponent(query)}`;
 
     try {
         const response = await fetch(url);
@@ -361,7 +376,9 @@ window.filterNews = (category) => {
     document.querySelectorAll('.news-tab').forEach(tab => {
         tab.classList.remove('active', 'bg-indigo-600', 'text-white');
         tab.classList.add('text-slate-500');
-        if (tab.textContent.toLowerCase() === category || (category === 'all' && tab.textContent === 'All')) {
+        const tabLabel = tab.textContent.toLowerCase().trim();
+        const categoryLabel = category.toLowerCase().trim();
+        if (tabLabel === categoryLabel || (category === 'all' && tabLabel === 'all')) {
             tab.classList.add('active', 'bg-indigo-600', 'text-white');
             tab.classList.remove('text-slate-500');
         }
@@ -419,15 +436,23 @@ function copyOfflinePath() {
 
 // Data Fetching
 async function fetchResources() {
-    if (!supabaseClient) {
-        resources = [];
-        folders = [];
-        renderResources();
-        return;
+    // Try to load from localStorage first for instant UI
+    try {
+        const cachedResources = localStorage.getItem('studyhub_resources');
+        const cachedFolders = localStorage.getItem('studyhub_folders');
+        if (cachedResources) resources = JSON.parse(cachedResources);
+        if (cachedFolders) folders = JSON.parse(cachedFolders);
+    } catch (e) {
+        console.warn("Failed to parse local data:", e);
     }
+    
+    renderResources();
+    renderBreadcrumbs();
+
+    if (!supabaseClient) return;
 
     try {
-        // Fetch Folders
+        // Fetch Folders from Supabase
         let folderQuery = supabaseClient.from('folders').select('*');
         if (currentFolderId) {
             folderQuery = folderQuery.eq('parent_id', currentFolderId);
@@ -436,7 +461,7 @@ async function fetchResources() {
         }
         const { data: fData, error: fErr } = await folderQuery.order('name', { ascending: true });
 
-        // Fetch Resources
+        // Fetch Resources from Supabase
         let resourceQuery = supabaseClient.from('resources').select('*');
         if (currentFolderId) {
             resourceQuery = resourceQuery.eq('folder_id', currentFolderId);
@@ -445,16 +470,23 @@ async function fetchResources() {
         }
         const { data: rData, error: rErr } = await resourceQuery.order('created_at', { ascending: false });
 
-        if (fErr && fErr.code !== 'PGRST116' && fErr.code !== '42P01') throw fErr; // 42P01 is table not found
-        if (rErr) throw rErr;
+        if (fErr && fErr.code !== 'PGRST116' && fErr.code !== '42P01') throw fErr;
+        if (rErr && rErr.code !== '42P01') throw rErr;
         
-        folders = fData || [];
-        resources = rData || [];
+        if (fData) {
+            folders = fData;
+            localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+        }
+        if (rData) {
+            resources = rData;
+            localStorage.setItem('studyhub_resources', JSON.stringify(resources));
+        }
+        
         renderResources();
         renderBreadcrumbs();
     } catch (err) {
-        console.error("Error fetching data:", err);
-        showToast("Failed to fetch data", "alert-circle");
+        console.warn("Supabase fetch failed, using local data:", err);
+        // We already rendered local data above, so just log the warning
     }
 }
 
@@ -623,9 +655,20 @@ async function deleteItem() {
     const { id, itemType } = contextMenuItem;
 
     try {
-        const table = itemType === 'folder' ? 'folders' : 'resources';
-        const { error } = await supabaseClient.from(table).delete().eq('id', id);
-        if (error) throw error;
+        if (supabaseClient) {
+            const table = itemType === 'folder' ? 'folders' : 'resources';
+            const { error } = await supabaseClient.from(table).delete().eq('id', id);
+            if (error) throw error;
+        } else {
+            // Local fallback
+            if (itemType === 'folder') {
+                folders = folders.filter(f => f.id !== id);
+                localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+            } else {
+                resources = resources.filter(r => r.id !== id);
+                localStorage.setItem('studyhub_resources', JSON.stringify(resources));
+            }
+        }
         
         showToast(`Deleted ${itemType}`, "trash-2");
         fetchResources();
@@ -642,8 +685,14 @@ async function renderFolderListForMove() {
     listContainer.innerHTML = '<p class="text-xs text-slate-500 text-center py-4">Loading folders...</p>';
     
     try {
-        const { data: allFolders, error } = await supabaseClient.from('folders').select('*').order('name', { ascending: true });
-        if (error) throw error;
+        let allFolders = [];
+        if (supabaseClient) {
+            const { data, error } = await supabaseClient.from('folders').select('*').order('name', { ascending: true });
+            if (error) throw error;
+            allFolders = data || [];
+        } else {
+            allFolders = folders;
+        }
 
         listContainer.innerHTML = `
             <button onclick="selectFolderForMove(null)" class="w-full text-left px-4 py-3 rounded-xl border border-slate-800 hover:border-indigo-500 transition-all flex items-center gap-3 bg-slate-900/50 mb-2">
@@ -728,8 +777,19 @@ async function confirmMove() {
         const table = contextMenuItem.itemType === 'folder' ? 'folders' : 'resources';
         const column = contextMenuItem.itemType === 'folder' ? 'parent_id' : 'folder_id';
         
-        const { error } = await supabaseClient.from(table).update({ [column]: selectedFolderIdForMove }).eq('id', contextMenuItem.id);
-        if (error) throw error;
+        if (supabaseClient) {
+            const { error } = await supabaseClient.from(table).update({ [column]: selectedFolderIdForMove }).eq('id', contextMenuItem.id);
+            if (error) throw error;
+        } else {
+            // Local fallback
+            if (contextMenuItem.itemType === 'folder') {
+                folders = folders.map(f => f.id === contextMenuItem.id ? { ...f, parent_id: selectedFolderIdForMove } : f);
+                localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+            } else {
+                resources = resources.map(r => r.id === contextMenuItem.id ? { ...r, folder_id: selectedFolderIdForMove } : r);
+                localStorage.setItem('studyhub_resources', JSON.stringify(resources));
+            }
+        }
         
         showToast("Moved successfully", "folder-input");
         closeMoveModal();
@@ -779,19 +839,34 @@ async function handleResourceSubmit(e) {
 
     try {
         let error;
-        if (contextMenuItem && contextMenuItem.id) {
-            // Update existing
-            ({ error } = await supabaseClient.from('resources').update({
-                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive
-            }).eq('id', contextMenuItem.id));
+        if (supabaseClient) {
+            if (contextMenuItem && contextMenuItem.id) {
+                // Update existing
+                ({ error } = await supabaseClient.from('resources').update({
+                    title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive
+                }).eq('id', contextMenuItem.id));
+            } else {
+                // Insert new
+                ({ error } = await supabaseClient.from('resources').insert([{
+                    title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive, folder_id: currentFolderId
+                }]));
+            }
+            if (error) throw error;
         } else {
-            // Insert new
-            ({ error } = await supabaseClient.from('resources').insert([{
-                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive, folder_id: currentFolderId
-            }]));
+            // Local fallback
+            const newRes = {
+                id: contextMenuItem?.id || `local-${Date.now()}`,
+                title, type, author, tags, link_url: finalUrl, is_offline: isOffline, is_google_drive: isGoogleDrive, folder_id: currentFolderId,
+                created_at: new Date().toISOString()
+            };
+            if (contextMenuItem && contextMenuItem.id) {
+                resources = resources.map(r => r.id === contextMenuItem.id ? newRes : r);
+            } else {
+                resources.push(newRes);
+            }
+            localStorage.setItem('studyhub_resources', JSON.stringify(resources));
         }
         
-        if (error) throw error;
         showToast(contextMenuItem ? "Resource updated!" : "Resource added!", "check");
         closeModal();
         fetchResources();
@@ -811,10 +886,21 @@ async function handleFolderSubmit(e) {
     const description = document.getElementById('folder-desc').value;
 
     try {
-        const { error } = await supabaseClient.from('folders').insert([{
-            name, description, parent_id: currentFolderId
-        }]);
-        if (error) throw error;
+        if (supabaseClient) {
+            const { error } = await supabaseClient.from('folders').insert([{
+                name, description, parent_id: currentFolderId
+            }]);
+            if (error) throw error;
+        } else {
+            // Local fallback
+            const newFolder = {
+                id: `local-folder-${Date.now()}`,
+                name, description, parent_id: currentFolderId,
+                created_at: new Date().toISOString()
+            };
+            folders.push(newFolder);
+            localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+        }
         showToast("Folder created!", "folder-plus");
         closeFolderModal();
         fetchResources();
@@ -874,8 +960,15 @@ async function handleChat() {
             throw new Error("Gemini API Key is missing. Please set it in your environment.");
         }
         // Fetch ALL resources and folders for context
-        const { data: allRes } = await supabaseClient.from('resources').select('*');
-        const { data: allFolders } = await supabaseClient.from('folders').select('*');
+        let allRes = resources;
+        let allFolders = folders;
+        
+        if (supabaseClient) {
+            const { data: resData } = await supabaseClient.from('resources').select('*');
+            const { data: folderData } = await supabaseClient.from('folders').select('*');
+            if (resData) allRes = resData;
+            if (folderData) allFolders = folderData;
+        }
         
         const context = `
             You are a helpful Study Assistant for StudyHub. 
@@ -1116,3 +1209,6 @@ window.closeDriveViewer = closeDriveViewer;
 window.closeOfflineModal = closeOfflineModal;
 window.copyOfflinePath = copyOfflinePath;
 window.selectFolderForMove = selectFolderForMove;
+window.fetchNews = fetchNews;
+window.openNewsModal = openNewsModal;
+window.filterNews = window.filterNews; // Already assigned but for clarity
