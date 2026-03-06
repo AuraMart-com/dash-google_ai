@@ -171,69 +171,82 @@ function closeNewsModal() {
     newsModal.classList.remove('active');
 }
 
+const NEWS_API_KEY = import.meta.env.VITE_NEWS_API_KEY;
+
 async function fetchNews() {
     const newsFeed = document.getElementById('news-feed');
     
-    // Check if we have cached news that is not older than 6 hours
-    const cachedNews = localStorage.getItem('studyhub_news');
-    const lastFetch = localStorage.getItem('studyhub_news_timestamp');
-    const now = Date.now();
-    
-    if (cachedNews && lastFetch && (now - lastFetch < 6 * 60 * 60 * 1000)) {
-        newsItems = JSON.parse(cachedNews);
-        // Filter out news older than 2 days
-        newsItems = newsItems.filter(item => {
-            const itemDate = new Date(item.date);
-            const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000);
-            return itemDate > twoDaysAgo;
-        });
-        renderNews();
+    // Show loading state
+    newsFeed.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-40">
+            <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+        </div>
+    `;
+
+    if (!NEWS_API_KEY || NEWS_API_KEY === 'YOUR_NEWS_API_KEY_HERE') {
+        newsFeed.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
+                <div class="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-2">
+                    <i data-lucide="key" class="w-8 h-8 text-amber-500"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-200">API Key Required</h3>
+                <p class="text-slate-500 text-sm max-w-xs">Please set <code class="bg-slate-800 px-1 rounded text-indigo-400">VITE_NEWS_API_KEY</code> in your environment variables to see real-time news.</p>
+            </div>
+        `;
+        lucide.createIcons();
         return;
     }
 
+    // Map categories to GNews queries
+    let query = 'technology';
+    if (currentNewsFilter === 'cybersecurity') query = 'cybersecurity';
+    else if (currentNewsFilter === 'ai') query = '"artificial intelligence"';
+    else if (currentNewsFilter === 'hyderabad') query = 'hyderabad';
+    else if (currentNewsFilter === 'jobs') query = '"tech jobs"';
+    else if (currentNewsFilter === 'tech') query = 'technology';
+
+    const url = `/api/news?q=${encodeURIComponent(query)}`;
+
     try {
-        const prompt = `
-            Generate 15 realistic news headlines and short summaries for a study dashboard.
-            Topics to cover: Cybersecurity, Tech, Indian-Tech, Cybersecurity Jobs, AI/ML, AI technologies, Hyderabad tech, Hyderabad real-estate, Hyderabad businesses, Hyderabad investments.
-            
-            Return ONLY a JSON array of objects with these fields:
-            - id: unique string
-            - title: string
-            - summary: string (max 150 chars)
-            - category: one of [cybersecurity, tech, ai, hyderabad, jobs]
-            - date: ISO date string (must be within the last 48 hours)
-            - source: string (e.g. TechCrunch, Times of India, etc)
-            - url: string (placeholder url)
-            - thumbnail: string (a high-quality placeholder image URL from picsum.photos with a relevant seed)
-        `;
+        const response = await fetch(url);
+        const data = await response.json();
 
-        const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            config: {
-                responseMimeType: "application/json"
-            }
-        });
-
-        let text = response.text;
-        // Clean up the response if it contains markdown blocks
-        if (text.includes('```json')) {
-            text = text.split('```json')[1].split('```')[0].trim();
-        } else if (text.includes('```')) {
-            text = text.split('```')[1].split('```')[0].trim();
+        if (!response.ok) {
+            throw new Error(data.errors ? data.errors[0] : "API limit reached or invalid key");
         }
-
-        const data = JSON.parse(text);
-        newsItems = data;
+        newsItems = data.articles.map((article, index) => ({
+            id: `news-${index}-${Date.now()}`,
+            title: article.title,
+            summary: article.description,
+            category: currentNewsFilter,
+            date: article.publishedAt,
+            source: article.source.name,
+            url: article.url,
+            thumbnail: article.image
+        }));
         
-        // Cache it
-        localStorage.setItem('studyhub_news', JSON.stringify(newsItems));
-        localStorage.setItem('studyhub_news_timestamp', now.toString());
+        // Update Breaking News Ticker
+        const ticker = document.getElementById('breaking-news-ticker');
+        if (ticker && newsItems.length > 0) {
+            ticker.textContent = newsItems.map(item => item.title).join(' • ');
+        }
         
         renderNews();
     } catch (err) {
-        console.error("News Fetch Error:", err);
-        newsFeed.innerHTML = '<p class="col-span-full text-center text-red-400 py-10">Failed to load news. Please try again later.</p>';
+        console.error("News API Error:", err);
+        newsFeed.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 gap-4">
+                <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-2">
+                    <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-200">Feed Unavailable</h3>
+                <p class="text-slate-500 text-sm text-center max-w-xs">${err.message || "Could not connect to the news service."}</p>
+                <button onclick="fetchNews()" class="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all flex items-center gap-2">
+                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Try Again
+                </button>
+            </div>
+        `;
+        lucide.createIcons();
     }
 }
 
@@ -246,37 +259,84 @@ function renderNews() {
         : newsItems.filter(item => item.category === currentNewsFilter);
 
     if (filtered.length === 0) {
-        newsFeed.innerHTML = '<p class="col-span-full text-center text-slate-500 py-10">No news found in this category.</p>';
+        newsFeed.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 gap-4">
+                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center opacity-50">
+                    <i data-lucide="inbox" class="w-8 h-8 text-slate-500"></i>
+                </div>
+                <p class="text-slate-500 font-medium">No reports found in this category.</p>
+            </div>
+        `;
         return;
     }
 
+    // Editorial Header for the list
+    const sectionHeader = document.createElement('div');
+    sectionHeader.className = 'flex items-center justify-between mb-2 px-2';
+    sectionHeader.innerHTML = `
+        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Latest Reports</span>
+        <span class="text-[10px] font-bold text-slate-500 italic">Showing ${filtered.length} stories</span>
+    `;
+    newsFeed.appendChild(sectionHeader);
+
     filtered.forEach((item, index) => {
         const card = document.createElement('div');
-        card.className = 'bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden hover:border-indigo-500 transition-all group animate-fade-in flex flex-col md:flex-row';
-        card.style.animationDelay = `${index * 0.1}s`;
+        card.className = 'group relative bg-slate-800/20 hover:bg-slate-800/40 border-b border-slate-800/50 last:border-0 transition-all duration-300 animate-fade-in';
+        card.style.animationDelay = `${index * 0.05}s`;
         
         const dateObj = new Date(item.date);
         const timeAgo = formatTimeAgo(dateObj);
-        const thumbnail = item.thumbnail || `https://picsum.photos/seed/${item.id}/400/250`;
+        
+        // Validate URLs
+        const isValidArticleUrl = item.url && item.url.startsWith('http');
+        const articleUrl = isValidArticleUrl ? item.url : '#';
+        const thumbnail = item.thumbnail && item.thumbnail.startsWith('http') ? item.thumbnail : `https://picsum.photos/seed/${item.id}/600/400`;
 
         card.innerHTML = `
-            <div class="w-full md:w-48 h-48 md:h-auto shrink-0 relative overflow-hidden">
-                <img src="${thumbnail}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer">
-                <div class="absolute top-3 left-3">
-                    <span class="px-2 py-1 bg-indigo-600/90 backdrop-blur-sm text-white rounded text-[10px] font-bold uppercase tracking-wider shadow-lg">${item.category}</span>
+            <div class="flex flex-col md:flex-row gap-6 py-8 px-2">
+                <!-- Thumbnail with Editorial Overlay -->
+                <div class="w-full md:w-64 h-44 shrink-0 relative rounded-xl overflow-hidden shadow-2xl bg-slate-800">
+                    <img src="${thumbnail}" 
+                         onerror="this.onerror=null; this.src='https://picsum.photos/seed/${item.id}/600/400';" 
+                         alt="${item.title}" 
+                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
+                         referrerPolicy="no-referrer">
+                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60"></div>
+                    <div class="absolute top-3 left-3">
+                        <span class="px-2 py-1 bg-indigo-600 text-white rounded text-[9px] font-black uppercase tracking-widest shadow-xl">${item.category}</span>
+                    </div>
                 </div>
-            </div>
-            <div class="flex-1 p-5 flex flex-col">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] text-slate-500 font-bold italic">${item.source}</span>
-                    <span class="text-[10px] text-slate-500 font-medium">${timeAgo}</span>
-                </div>
-                <h4 class="text-base font-bold text-slate-200 mb-2 group-hover:text-indigo-400 transition-colors line-clamp-2">${item.title}</h4>
-                <p class="text-xs text-slate-400 mb-4 line-clamp-2 flex-1">${item.summary}</p>
-                <div class="flex items-center justify-end mt-auto pt-4 border-t border-slate-700/50">
-                    <a href="${item.url}" target="_blank" class="text-[10px] font-bold text-indigo-400 hover:underline flex items-center gap-1">
-                        Read Full Story <i data-lucide="external-link" class="w-3 h-3"></i>
-                    </a>
+                
+                <!-- Content -->
+                <div class="flex-1 flex flex-col">
+                    <div class="flex items-center gap-3 mb-3">
+                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">${item.source}</span>
+                        <div class="w-1 h-1 bg-slate-700 rounded-full"></div>
+                        <span class="text-[10px] text-slate-500 font-bold">${timeAgo}</span>
+                    </div>
+                    
+                    <h4 class="text-xl font-bold text-slate-100 mb-3 leading-tight group-hover:text-indigo-400 transition-colors">
+                        <a href="${articleUrl}" target="_blank" class="hover:underline decoration-indigo-500/30 underline-offset-4">${item.title}</a>
+                    </h4>
+                    
+                    <p class="text-sm text-slate-400 leading-relaxed mb-6 line-clamp-2 font-medium italic opacity-80">
+                        ${item.summary}
+                    </p>
+                    
+                    <div class="mt-auto flex items-center justify-between">
+                        <div class="flex items-center gap-4">
+                            <button class="text-slate-500 hover:text-indigo-400 transition-colors">
+                                <i data-lucide="bookmark" class="w-4 h-4"></i>
+                            </button>
+                            <button class="text-slate-500 hover:text-indigo-400 transition-colors">
+                                <i data-lucide="share-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <a href="${articleUrl}" target="_blank" class="group/btn inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-all ${!isValidArticleUrl ? 'pointer-events-none opacity-50' : ''}">
+                            Full Coverage 
+                            <i data-lucide="arrow-right" class="w-3 h-3 group-hover/btn:translate-x-1 transition-transform"></i>
+                        </a>
+                    </div>
                 </div>
             </div>
         `;
@@ -296,6 +356,7 @@ function formatTimeAgo(date) {
 }
 
 window.filterNews = (category) => {
+    if (currentNewsFilter === category) return;
     currentNewsFilter = category;
     document.querySelectorAll('.news-tab').forEach(tab => {
         tab.classList.remove('active', 'bg-indigo-600', 'text-white');
@@ -305,7 +366,7 @@ window.filterNews = (category) => {
             tab.classList.remove('text-slate-500');
         }
     });
-    renderNews();
+    fetchNews();
 };
 
 function openDriveViewer(url, title) {
@@ -809,6 +870,9 @@ async function handleChat() {
     const botContent = botMsgDiv.querySelector('.bot-content');
 
     try {
+        if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+            throw new Error("Gemini API Key is missing. Please set it in your environment.");
+        }
         // Fetch ALL resources and folders for context
         const { data: allRes } = await supabaseClient.from('resources').select('*');
         const { data: allFolders } = await supabaseClient.from('folders').select('*');
@@ -828,7 +892,7 @@ async function handleChat() {
         `;
 
         const response = await ai.models.generateContentStream({
-            model: "gemini-3-flash-preview",
+            model: "gemini-3.1-flash-lite-preview",
             contents: [{ role: 'user', parts: [{ text }] }],
             config: {
                 systemInstruction: context
@@ -905,14 +969,20 @@ timerReset.addEventListener('click', resetTimer);
 async function fetchDailyInsight() {
     insightText.classList.add('opacity-50');
     try {
+        if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+            throw new Error("API Key missing");
+        }
         const prompt = "Generate a short, inspiring study tip or motivational quote for a student. Max 100 characters.";
         const response = await ai.models.generateContent({
-            model: "gemini-3-flash-preview",
+            model: "gemini-3.1-flash-lite-preview",
             contents: [{ role: 'user', parts: [{ text: prompt }] }]
         });
-        insightText.textContent = `"${response.text.trim()}"`;
+        if (response.text) {
+            insightText.textContent = `"${response.text.trim()}"`;
+        }
     } catch (err) {
         console.error("Insight Error:", err);
+        insightText.textContent = '"The beautiful thing about learning is that no one can take it away from you."';
     } finally {
         insightText.classList.remove('opacity-50');
     }
