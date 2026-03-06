@@ -4,11 +4,17 @@ lucide.createIcons();
 // Gemini API Integration
 import { GoogleGenAI } from "@google/genai";
 
-// For static hosting, we'll try to get the key from process.env (Vite/Build) 
-// or fallback to a placeholder that the user can fill.
-const GEMINI_API_KEY = typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY 
-    ? process.env.GEMINI_API_KEY 
-    : 'YOUR_GEMINI_API_KEY_HERE';
+// Vite will replace process.env.GEMINI_API_KEY with the actual key during build/dev
+let GEMINI_API_KEY = 'YOUR_GEMINI_API_KEY_HERE';
+try {
+    // This string is replaced by Vite during build
+    const envKey = process.env.GEMINI_API_KEY;
+    if (envKey && envKey !== 'undefined') {
+        GEMINI_API_KEY = envKey;
+    }
+} catch (e) {
+    // process is not defined in browser
+}
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
@@ -27,12 +33,21 @@ try {
 // State
 let resources = [];
 let folders = [];
+let newsItems = [];
 let currentFolderId = null;
 let activeInputMode = 'url'; // 'url' or 'file'
 let contextMenuItem = null; // Stores the item currently targeted by context menu
+let currentNewsFilter = 'all';
+let studyTimerInterval = null;
+let studyTimeRemaining = 0; // in seconds
 
 // DOM Elements
 const newsFeed = document.getElementById('news-feed');
+const insightText = document.getElementById('insight-text');
+const refreshInsightBtn = document.getElementById('refresh-insight');
+const timerDisplay = document.getElementById('timer-display');
+const timerToggle = document.getElementById('timer-toggle');
+const timerReset = document.getElementById('timer-reset');
 const resourceGallery = document.getElementById('resource-gallery');
 const chatWidget = document.getElementById('chat-widget');
 const openChatBtn = document.getElementById('open-chat');
@@ -149,12 +164,149 @@ function closeOfflineModal() {
 
 function openNewsModal() {
     newsModal.classList.add('active');
-    renderNews();
+    fetchNews();
 }
 
 function closeNewsModal() {
     newsModal.classList.remove('active');
 }
+
+async function fetchNews() {
+    const newsFeed = document.getElementById('news-feed');
+    
+    // Check if we have cached news that is not older than 6 hours
+    const cachedNews = localStorage.getItem('studyhub_news');
+    const lastFetch = localStorage.getItem('studyhub_news_timestamp');
+    const now = Date.now();
+    
+    if (cachedNews && lastFetch && (now - lastFetch < 6 * 60 * 60 * 1000)) {
+        newsItems = JSON.parse(cachedNews);
+        // Filter out news older than 2 days
+        newsItems = newsItems.filter(item => {
+            const itemDate = new Date(item.date);
+            const twoDaysAgo = new Date(now - 2 * 24 * 60 * 60 * 1000);
+            return itemDate > twoDaysAgo;
+        });
+        renderNews();
+        return;
+    }
+
+    try {
+        const prompt = `
+            Generate 15 realistic news headlines and short summaries for a study dashboard.
+            Topics to cover: Cybersecurity, Tech, Indian-Tech, Cybersecurity Jobs, AI/ML, AI technologies, Hyderabad tech, Hyderabad real-estate, Hyderabad businesses, Hyderabad investments.
+            
+            Return ONLY a JSON array of objects with these fields:
+            - id: unique string
+            - title: string
+            - summary: string (max 150 chars)
+            - category: one of [cybersecurity, tech, ai, hyderabad, jobs]
+            - date: ISO date string (must be within the last 48 hours)
+            - source: string (e.g. TechCrunch, Times of India, etc)
+            - url: string (placeholder url)
+            - thumbnail: string (a high-quality placeholder image URL from picsum.photos with a relevant seed)
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            config: {
+                responseMimeType: "application/json"
+            }
+        });
+
+        let text = response.text;
+        // Clean up the response if it contains markdown blocks
+        if (text.includes('```json')) {
+            text = text.split('```json')[1].split('```')[0].trim();
+        } else if (text.includes('```')) {
+            text = text.split('```')[1].split('```')[0].trim();
+        }
+
+        const data = JSON.parse(text);
+        newsItems = data;
+        
+        // Cache it
+        localStorage.setItem('studyhub_news', JSON.stringify(newsItems));
+        localStorage.setItem('studyhub_news_timestamp', now.toString());
+        
+        renderNews();
+    } catch (err) {
+        console.error("News Fetch Error:", err);
+        newsFeed.innerHTML = '<p class="col-span-full text-center text-red-400 py-10">Failed to load news. Please try again later.</p>';
+    }
+}
+
+function renderNews() {
+    const newsFeed = document.getElementById('news-feed');
+    newsFeed.innerHTML = '';
+    
+    const filtered = currentNewsFilter === 'all' 
+        ? newsItems 
+        : newsItems.filter(item => item.category === currentNewsFilter);
+
+    if (filtered.length === 0) {
+        newsFeed.innerHTML = '<p class="col-span-full text-center text-slate-500 py-10">No news found in this category.</p>';
+        return;
+    }
+
+    filtered.forEach((item, index) => {
+        const card = document.createElement('div');
+        card.className = 'bg-slate-800/50 border border-slate-700 rounded-2xl overflow-hidden hover:border-indigo-500 transition-all group animate-fade-in flex flex-col md:flex-row';
+        card.style.animationDelay = `${index * 0.1}s`;
+        
+        const dateObj = new Date(item.date);
+        const timeAgo = formatTimeAgo(dateObj);
+        const thumbnail = item.thumbnail || `https://picsum.photos/seed/${item.id}/400/250`;
+
+        card.innerHTML = `
+            <div class="w-full md:w-48 h-48 md:h-auto shrink-0 relative overflow-hidden">
+                <img src="${thumbnail}" alt="${item.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer">
+                <div class="absolute top-3 left-3">
+                    <span class="px-2 py-1 bg-indigo-600/90 backdrop-blur-sm text-white rounded text-[10px] font-bold uppercase tracking-wider shadow-lg">${item.category}</span>
+                </div>
+            </div>
+            <div class="flex-1 p-5 flex flex-col">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[10px] text-slate-500 font-bold italic">${item.source}</span>
+                    <span class="text-[10px] text-slate-500 font-medium">${timeAgo}</span>
+                </div>
+                <h4 class="text-base font-bold text-slate-200 mb-2 group-hover:text-indigo-400 transition-colors line-clamp-2">${item.title}</h4>
+                <p class="text-xs text-slate-400 mb-4 line-clamp-2 flex-1">${item.summary}</p>
+                <div class="flex items-center justify-end mt-auto pt-4 border-t border-slate-700/50">
+                    <a href="${item.url}" target="_blank" class="text-[10px] font-bold text-indigo-400 hover:underline flex items-center gap-1">
+                        Read Full Story <i data-lucide="external-link" class="w-3 h-3"></i>
+                    </a>
+                </div>
+            </div>
+        `;
+        newsFeed.appendChild(card);
+    });
+    
+    lucide.createIcons();
+}
+
+function formatTimeAgo(date) {
+    const seconds = Math.floor((new Date() - date) / 1000);
+    let interval = Math.floor(seconds / 3600);
+    if (interval >= 1) return interval + "h ago";
+    interval = Math.floor(seconds / 60);
+    if (interval >= 1) return interval + "m ago";
+    return "Just now";
+}
+
+window.filterNews = (category) => {
+    currentNewsFilter = category;
+    document.querySelectorAll('.news-tab').forEach(tab => {
+        tab.classList.remove('active', 'bg-indigo-600', 'text-white');
+        tab.classList.add('text-slate-500');
+        if (tab.textContent.toLowerCase() === category || (category === 'all' && tab.textContent === 'All')) {
+            tab.classList.add('active', 'bg-indigo-600', 'text-white');
+            tab.classList.remove('text-slate-500');
+        }
+    });
+    renderNews();
+};
 
 function openDriveViewer(url, title) {
     viewerTitle.textContent = title;
@@ -699,7 +851,81 @@ async function handleChat() {
     }
 }
 
+// Timer Logic
+function updateTimerDisplay() {
+    const minutes = Math.floor(studyTimeRemaining / 60);
+    const seconds = studyTimeRemaining % 60;
+    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function toggleTimer() {
+    if (studyTimerInterval) {
+        // Stop
+        clearInterval(studyTimerInterval);
+        studyTimerInterval = null;
+        timerToggle.textContent = 'Start';
+        timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
+        timerToggle.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
+    } else {
+        // Start
+        if (studyTimeRemaining <= 0) studyTimeRemaining = 25 * 60;
+        timerToggle.textContent = 'Stop';
+        timerToggle.classList.replace('bg-indigo-600', 'bg-red-600');
+        timerToggle.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
+        
+        studyTimerInterval = setInterval(() => {
+            studyTimeRemaining--;
+            updateTimerDisplay();
+            if (studyTimeRemaining <= 0) {
+                clearInterval(studyTimerInterval);
+                studyTimerInterval = null;
+                timerToggle.textContent = 'Start';
+                timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
+                showToast("Focus session complete! Take a break.", "coffee");
+                // Play a subtle sound if possible or just visual feedback
+            }
+        }, 1000);
+    }
+}
+
+function resetTimer() {
+    clearInterval(studyTimerInterval);
+    studyTimerInterval = null;
+    studyTimeRemaining = 25 * 60;
+    updateTimerDisplay();
+    timerToggle.textContent = 'Start';
+    timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
+}
+
 // Event Listeners
+timerToggle.addEventListener('click', toggleTimer);
+timerReset.addEventListener('click', resetTimer);
+
+// Insight Logic
+async function fetchDailyInsight() {
+    insightText.classList.add('opacity-50');
+    try {
+        const prompt = "Generate a short, inspiring study tip or motivational quote for a student. Max 100 characters.";
+        const response = await ai.models.generateContent({
+            model: "gemini-3-flash-preview",
+            contents: [{ role: 'user', parts: [{ text: prompt }] }]
+        });
+        insightText.textContent = `"${response.text.trim()}"`;
+    } catch (err) {
+        console.error("Insight Error:", err);
+    } finally {
+        insightText.classList.remove('opacity-50');
+    }
+}
+
+// Event Listeners
+refreshInsightBtn.addEventListener('click', fetchDailyInsight);
+
+// Initialize Timer
+studyTimeRemaining = 25 * 60;
+updateTimerDisplay();
+fetchDailyInsight();
+
 quickAddToggle.addEventListener('click', (e) => {
     e.stopPropagation();
     quickAddMenu.classList.toggle('active');
@@ -804,27 +1030,7 @@ openChatBtn.addEventListener('click', () => {
 sendChatBtn.addEventListener('click', handleChat);
 chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') handleChat(); });
 
-// News Rendering
-function renderNews() {
-    const NEWS_DATA = [
-        { title: "New Breakthrough in Quantum Computing", source: "Science Daily", time: "2h ago", category: "Tech" },
-        { title: "Top 10 Study Techniques for 2024", source: "EduWeekly", time: "5h ago", category: "Education" },
-        { title: "The Future of Remote Learning", source: "Global News", time: "8h ago", category: "Society" }
-    ];
-    newsFeed.innerHTML = NEWS_DATA.map((news, index) => `
-        <div class="news-item p-4 bg-[#1e293b] rounded-xl border border-slate-800 shadow-sm transition-all cursor-pointer animate-fade-in" style="animation-delay: ${index * 0.1}s">
-            <div class="flex justify-between items-start mb-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">${news.category}</span>
-                <span class="text-[10px] text-slate-500">${news.time}</span>
-            </div>
-            <h3 class="text-sm font-semibold text-slate-200 leading-snug mb-1">${news.title}</h3>
-            <p class="text-[11px] text-slate-500">${news.source}</p>
-        </div>
-    `).join('');
-}
-
 // Initialize
-renderNews();
 fetchResources();
 
 // Expose navigation to window for breadcrumbs
