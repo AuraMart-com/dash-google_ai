@@ -203,3 +203,32 @@ nav a.active {
 .dropdown-menu.active {
     display: block;
 }
+
+/* Sidebar Minimized State */
+#sidebar.minimized {
+    width: 80px;
+}
+
+#sidebar.minimized .sidebar-content {
+    display: none;
+}
+
+#sidebar.minimized nav a span, 
+#sidebar.minimized nav button span {
+    display: none;
+}
+
+#sidebar.minimized nav a, 
+#sidebar.minimized nav button {
+    justify-content: center;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+#sidebar.minimized h1 {
+    display: none;
+}
+
+#sidebar.minimized .p-6 {
+    justify-content: center;
+}

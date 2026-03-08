@@ -96,6 +96,13 @@ const driveIframe = document.getElementById('drive-iframe');
 const viewerTitle = document.getElementById('viewer-title');
 const viewerLoader = document.getElementById('viewer-loader');
 const viewerExternal = document.getElementById('viewer-external');
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebar-toggle');
+const passwordModal = document.getElementById('password-modal');
+const apiManagerModal = document.getElementById('api-manager-modal');
+const accessPasswordInput = document.getElementById('access-password');
+const managerNewsKeyInput = document.getElementById('manager-news-key');
+const managerGeminiKeyInput = document.getElementById('manager-gemini-key');
 
 function saveNewsKeyFromUI() {
     const input = document.getElementById('news-api-key-input');
@@ -104,6 +111,76 @@ function saveNewsKeyFromUI() {
         window.setNewsApiKey(key);
     } else {
         showToast("Please enter a valid key", "alert-circle");
+    }
+}
+
+// Sidebar Toggle
+if (sidebarToggle) {
+    sidebarToggle.addEventListener('click', () => {
+        sidebar.classList.toggle('minimized');
+    });
+}
+
+// API Management Functions
+function openPasswordModal() {
+    passwordModal.classList.remove('hidden');
+    accessPasswordInput.value = '';
+    accessPasswordInput.focus();
+}
+
+function closePasswordModal() {
+    passwordModal.classList.add('hidden');
+}
+
+function checkPassword() {
+    const password = accessPasswordInput.value.trim();
+    if (password === 'gnewsyt.com') {
+        closePasswordModal();
+        openApiManager();
+    } else {
+        showToast("Incorrect password", "alert-circle");
+        accessPasswordInput.value = '';
+        accessPasswordInput.focus();
+    }
+}
+
+function openApiManager() {
+    apiManagerModal.classList.remove('hidden');
+    managerNewsKeyInput.value = localStorage.getItem('STUDYHUB_VITE_NEWS_API_KEY') || '';
+    managerGeminiKeyInput.value = localStorage.getItem('STUDYHUB_VITE_GEMINI_API_KEY') || '';
+}
+
+function closeApiManager() {
+    apiManagerModal.classList.add('hidden');
+}
+
+function saveManagerKey(type) {
+    if (type === 'news') {
+        const key = managerNewsKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('STUDYHUB_VITE_NEWS_API_KEY', key);
+            showToast("News API Key updated", "check");
+            setTimeout(() => location.reload(), 1000);
+        }
+    } else if (type === 'gemini') {
+        const key = managerGeminiKeyInput.value.trim();
+        if (key) {
+            localStorage.setItem('STUDYHUB_VITE_GEMINI_API_KEY', key);
+            showToast("Gemini API Key updated", "check");
+            setTimeout(() => location.reload(), 1000);
+        }
+    }
+}
+
+function deleteManagerKey(type) {
+    if (type === 'news') {
+        localStorage.removeItem('STUDYHUB_VITE_NEWS_API_KEY');
+        managerNewsKeyInput.value = '';
+        showToast("News API Key deleted", "trash-2");
+    } else if (type === 'gemini') {
+        localStorage.removeItem('STUDYHUB_VITE_GEMINI_API_KEY');
+        managerGeminiKeyInput.value = '';
+        showToast("Gemini API Key deleted", "trash-2");
     }
 }
 
@@ -1243,3 +1320,10 @@ window.fetchNews = fetchNews;
 window.openNewsModal = openNewsModal;
 window.filterNews = filterNews;
 window.saveNewsKeyFromUI = saveNewsKeyFromUI;
+window.openPasswordModal = openPasswordModal;
+window.closePasswordModal = closePasswordModal;
+window.checkPassword = checkPassword;
+window.openApiManager = openApiManager;
+window.closeApiManager = closeApiManager;
+window.saveManagerKey = saveManagerKey;
+window.deleteManagerKey = deleteManagerKey;

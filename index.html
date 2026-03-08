@@ -62,8 +62,8 @@
     </div>
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
-        <aside class="w-64 bg-[#1e293b] border-r border-slate-800 flex flex-col shrink-0">
-            <div class="p-6 flex items-center gap-3">
+        <aside id="sidebar" class="w-64 bg-[#1e293b] border-r border-slate-800 flex flex-col shrink-0 transition-all duration-300 relative">
+            <div class="p-6 flex items-center gap-3 sidebar-content">
                 <div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white">
                     <i data-lucide="book-open" class="w-5 h-5"></i>
                 </div>
@@ -73,27 +73,27 @@
             <nav class="flex-1 px-4 space-y-1">
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-indigo-400 bg-indigo-500/10 rounded-lg font-medium transition-colors" data-nav="dashboard">
                     <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                    Dashboard
+                    <span>Dashboard</span>
                 </a>
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors" data-nav="books">
                     <i data-lucide="book" class="w-5 h-5"></i>
-                    My Books
+                    <span>My Books</span>
                 </a>
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors" data-nav="videos">
                     <i data-lucide="video" class="w-5 h-5"></i>
-                    Videos
+                    <span>Videos</span>
                 </a>
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors" data-nav="notes">
                     <i data-lucide="file-text" class="w-5 h-5"></i>
-                    Notes
+                    <span>Notes</span>
                 </a>
                 <a href="#" class="flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors" data-nav="tasks">
                     <i data-lucide="check-square" class="w-5 h-5"></i>
-                    Task List
+                    <span>Task List</span>
                 </a>
                 <button id="open-news-btn" class="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors">
                     <i data-lucide="rss" class="w-5 h-5"></i>
-                    News
+                    <span>News</span>
                 </button>
             </nav>
 
@@ -112,7 +112,7 @@
                 </div>
             </div>
 
-            <div class="p-4 border-t border-slate-800">
+            <div class="p-4 border-t border-slate-800 sidebar-content">
                 <div class="flex items-center gap-3 px-3 py-2">
                     <img src="https://picsum.photos/seed/user/40/40" alt="User" class="w-8 h-8 rounded-full border border-slate-700" referrerPolicy="no-referrer">
                     <div class="flex-1 overflow-hidden">
@@ -120,13 +120,19 @@
                         <p class="text-xs text-slate-500 truncate">Pro Student</p>
                     </div>
                 </div>
+                <div class="mt-2 px-3">
+                    <button onclick="openPasswordModal()" class="text-[10px] text-slate-600 hover:text-indigo-400 transition-colors uppercase font-bold tracking-widest">Change API</button>
+                </div>
             </div>
         </aside>
 
         <!-- Main Content -->
         <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
             <!-- Top Bar -->
-            <header class="h-16 bg-[#1e293b] border-b border-slate-800 flex items-center justify-between px-8 shrink-0">
+            <header class="h-16 bg-[#1e293b] border-b border-slate-800 flex items-center gap-6 px-8 shrink-0">
+                <button id="sidebar-toggle" class="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white">
+                    <i data-lucide="menu" class="w-6 h-6"></i>
+                </button>
                 <div class="flex-1 max-w-xl">
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
@@ -340,20 +346,19 @@
         <div id="news-modal" class="fixed inset-0 bg-[#0f172a] z-[500] flex flex-col opacity-0 pointer-events-none transition-all duration-300">
             <div class="flex-1 flex flex-col h-full bg-[#0f172a]" id="news-modal-content">
                 <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-[#1e293b] shrink-0">
-                    <div class="flex items-center gap-3">
-                        <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-900/40">
-                            <i data-lucide="newspaper" class="w-6 h-6"></i>
-                        </div>
-                        <div>
-                            <h3 class="text-xl font-bold text-white">Global & Local News</h3>
-                            <p id="news-last-updated" class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Live Intelligence Feed</p>
-                        </div>
-                    </div>
-                    <div class="flex items-center gap-4">
-                        <button onclick="closeNewsModal()" class="p-3 bg-slate-800 hover:bg-slate-700 rounded-2xl transition-all text-slate-400 hover:text-white flex items-center gap-2 font-bold text-sm">
-                            <i data-lucide="arrow-left" class="w-5 h-5"></i>
-                            Back to Dashboard
+                    <div class="flex items-center gap-6">
+                        <button onclick="closeNewsModal()" class="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-400 hover:text-white" title="Back to Dashboard">
+                            <i data-lucide="arrow-left" class="w-6 h-6"></i>
                         </button>
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-900/40">
+                                <i data-lucide="newspaper" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-bold text-white">Global & Local News</h3>
+                                <p id="news-last-updated" class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Live Intelligence Feed</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
@@ -545,6 +550,66 @@
 
     <!-- Toast Container -->
     <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Password Modal -->
+    <div id="password-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[600] hidden flex items-center justify-center p-4">
+        <div class="bg-[#1e293b] rounded-2xl shadow-xl w-full max-w-xs overflow-hidden border border-slate-800 animate-in fade-in zoom-in duration-200">
+            <div class="p-6 space-y-4">
+                <input type="password" id="access-password" placeholder="••••••••" 
+                    class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-center tracking-widest">
+                <div class="flex gap-2">
+                    <button onclick="closePasswordModal()" class="flex-1 py-2.5 bg-slate-800 text-slate-400 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all">Cancel</button>
+                    <button onclick="checkPassword()" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Verify</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Manager Modal -->
+    <div id="api-manager-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[600] hidden flex items-center justify-center p-4">
+        <div class="bg-[#1e293b] rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-800 animate-in fade-in zoom-in duration-200">
+            <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-indigo-900/10">
+                <h3 class="text-lg font-bold text-white">API Key Manager</h3>
+                <button onclick="closeApiManager()" class="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-6 space-y-6">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">GNews API Key</label>
+                        <div class="flex gap-2">
+                            <input type="password" id="manager-news-key" placeholder="Enter News API Key..." 
+                                class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-200">
+                            <button onclick="saveManagerKey('news')" class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Save</button>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="deleteManagerKey('news')" class="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider transition-colors">Delete Key</button>
+                        </div>
+                    </div>
+                    
+                    <div class="pt-4 border-t border-slate-800">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Gemini API Key</label>
+                        <div class="flex gap-2">
+                            <input type="password" id="manager-gemini-key" placeholder="Enter Gemini API Key..." 
+                                class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-200">
+                            <button onclick="saveManagerKey('gemini')" class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Save</button>
+                        </div>
+                        <div class="flex gap-2 mt-2">
+                            <button onclick="deleteManagerKey('gemini')" class="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider transition-colors">Delete Key</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
+                    <p class="text-[10px] text-slate-500 leading-relaxed">
+                        <span class="font-bold text-amber-500 uppercase tracking-widest block mb-1">Security Note</span>
+                        These keys are stored locally in your browser's storage. Deleting them will remove access to real-time features until a new key is added.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script type="module" src="js/script.js"></script>
 </body>
