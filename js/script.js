@@ -5,9 +5,39 @@ lucide.createIcons();
 // Gemini API Integration
 import { GoogleGenAI } from "@google/genai";
 
-// Fallback for environment variables in static hosting
-const GEMINI_API_KEY = 'AIzaSyASIew7fF7UigK7BqgGHOFLim9j67URVkM';
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+// API Key Management
+let apiKeys = [];
+try {
+    const savedKeys = localStorage.getItem('studyhub_api_keys');
+    if (savedKeys) apiKeys = JSON.parse(savedKeys);
+    
+    // Add default key if none exists
+    if (apiKeys.length === 0) {
+        apiKeys.push({
+            id: 'default',
+            key: 'AIzaSyASIew7fF7UigK7BqgGHOFLim9j67URVkM',
+            name: 'Default Key',
+            active: true
+        });
+        localStorage.setItem('studyhub_api_keys', JSON.stringify(apiKeys));
+    }
+} catch (e) {
+    console.warn("Failed to load API keys:", e);
+}
+
+function getActiveApiKey() {
+    const active = apiKeys.find(k => k.active);
+    return active ? active.key : null;
+}
+
+let ai = null;
+function initGemini() {
+    const key = getActiveApiKey();
+    if (key) {
+        ai = new GoogleGenAI({ apiKey: key });
+    }
+}
+initGemini();
 
 // Supabase Configuration
 const SUPABASE_URL = 'https://arqkzpnqfceqzrymzrnf.supabase.co';
@@ -31,15 +61,27 @@ let folders = [];
 let currentFolderId = null;
 let activeInputMode = 'url'; // 'url' or 'file'
 let contextMenuItem = null; // Stores the item currently targeted by context menu
-let studyTimerInterval = null;
-let studyTimeRemaining = 0; // in seconds
+let currentSort = 'newest';
+let searchQuery = '';
+let chatMode = 'local'; // 'local' or 'web'
+let isChatMaximized = false;
+
+// Settings State
+let settings = {
+    compactSidebar: false,
+    darkMode: true
+};
+
+try {
+    const savedSettings = localStorage.getItem('studyhub_settings');
+    if (savedSettings) settings = { ...settings, ...JSON.parse(savedSettings) };
+} catch (e) {
+    console.warn("Failed to load settings:", e);
+}
 
 // DOM Elements
 const insightText = document.getElementById('insight-text');
 const refreshInsightBtn = document.getElementById('refresh-insight');
-const timerDisplay = document.getElementById('timer-display');
-const timerToggle = document.getElementById('timer-toggle');
-const timerReset = document.getElementById('timer-reset');
 const resourceGallery = document.getElementById('resource-gallery');
 const chatWidget = document.getElementById('chat-widget');
 const openChatBtn = document.getElementById('open-chat');
@@ -47,6 +89,12 @@ const closeChatBtn = document.getElementById('close-chat');
 const chatInput = document.getElementById('chat-input');
 const sendChatBtn = document.getElementById('send-chat');
 const chatMessages = document.getElementById('chat-messages');
+const globalSearchInput = document.getElementById('global-search');
+const maximizeChatBtn = document.getElementById('maximize-chat');
+const chatModeToggle = document.getElementById('chat-mode-toggle');
+const chatModeMenu = document.getElementById('chat-mode-menu');
+const modeIcon = document.getElementById('mode-icon');
+const modeText = document.getElementById('mode-text');
 
 const quickAddToggle = document.getElementById('quick-add-toggle');
 const quickAddMenu = document.getElementById('quick-add-menu');
@@ -78,6 +126,16 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebarClose = document.getElementById('sidebar-close');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+// Settings Elements
+const settingsModal = document.getElementById('settings-modal');
+const openSettingsBtn = document.getElementById('open-settings');
+const apiKeysList = document.getElementById('api-keys-list');
+const newApiKeyInput = document.getElementById('new-api-key');
+const addApiKeyBtn = document.getElementById('add-api-key');
+const saveSettingsBtn = document.getElementById('save-settings');
+const clearCacheBtn = document.getElementById('clear-cache');
+const exportDataBtn = document.getElementById('export-data');
 
 // Sidebar Toggle
 if (sidebarToggle) {
@@ -132,12 +190,12 @@ async function copyToClipboard(text) {
 }
 
 // Modal Handlers
-function openModal() {
+window.openModal = function() {
     addModal.classList.add('active');
     quickAddMenu.classList.remove('active');
 }
 
-function closeModal() {
+window.closeModal = function() {
     addModal.classList.remove('active');
     addResourceForm.reset();
     document.getElementById('modal-title').textContent = 'Add New Resource';
@@ -148,28 +206,28 @@ function closeModal() {
     contextMenuItem = null;
 }
 
-function openFolderModal() {
+window.openFolderModal = function() {
     folderModal.classList.add('active');
     quickAddMenu.classList.remove('active');
 }
 
-function closeFolderModal() {
+window.closeFolderModal = function() {
     folderModal.classList.remove('active');
     addFolderForm.reset();
 }
 
-function openMoveModal(item) {
+window.openMoveModal = function(item) {
     contextMenuItem = item;
     moveModal.classList.add('active');
     renderFolderListForMove();
 }
 
-function closeMoveModal() {
+window.closeMoveModal = function() {
     moveModal.classList.remove('active');
     contextMenuItem = null;
 }
 
-function openOfflineModal(path) {
+window.openOfflineModal = function(path) {
     const modal = document.getElementById('offline-modal');
     const input = document.getElementById('offline-path-input');
     input.value = path;
@@ -177,13 +235,13 @@ function openOfflineModal(path) {
     modal.classList.add('flex');
 }
 
-function closeOfflineModal() {
+window.closeOfflineModal = function() {
     const modal = document.getElementById('offline-modal');
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
 
-function openDriveViewer(url, title) {
+window.openDriveViewer = function(url, title) {
     viewerTitle.textContent = title;
     viewerLoader.style.display = 'flex';
     driveViewerModal.classList.remove('hidden');
@@ -214,24 +272,126 @@ function openDriveViewer(url, title) {
     };
 }
 
-function closeDriveViewer() {
+window.closeDriveViewer = function() {
     driveViewerModal.classList.add('hidden');
     driveViewerModal.classList.remove('flex');
     driveIframe.src = '';
 }
 
-function openDeleteModal(item) {
+window.openDeleteModal = function(item) {
     contextMenuItem = item;
     document.getElementById('delete-item-name').textContent = item.name || item.title;
     deleteModal.classList.add('active');
 }
 
-function closeDeleteModal() {
+window.closeDeleteModal = function() {
     deleteModal.classList.remove('active');
     contextMenuItem = null;
 }
 
-function copyOfflinePath() {
+// Settings Handlers
+window.openSettingsModal = function() {
+    settingsModal.classList.add('active');
+    renderApiKeys();
+    
+    // Load current settings into UI
+    document.getElementById('setting-timer-duration').value = settings.timerDuration;
+    document.getElementById('setting-timer-sound').checked = settings.timerSound;
+    document.getElementById('setting-compact-sidebar').checked = settings.compactSidebar;
+}
+
+window.closeSettingsModal = function() {
+    settingsModal.classList.remove('active');
+}
+
+function renderApiKeys() {
+    apiKeysList.innerHTML = '';
+    apiKeys.forEach(keyObj => {
+        const keyEl = document.createElement('div');
+        keyEl.className = `p-3 rounded-xl border ${keyObj.active ? 'border-indigo-500 bg-indigo-500/10' : 'border-slate-800 bg-slate-900/50'} flex items-center justify-between gap-3`;
+        keyEl.innerHTML = `
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-bold text-slate-200 truncate">${keyObj.name}</span>
+                    ${keyObj.active ? '<span class="text-[8px] bg-indigo-600 text-white px-1.5 py-0.5 rounded uppercase font-black">Active</span>' : ''}
+                </div>
+                <p class="text-[10px] text-slate-500 font-mono truncate">${keyObj.key.substring(0, 8)}••••••••••••</p>
+            </div>
+            <div class="flex items-center gap-1">
+                ${!keyObj.active ? `
+                    <button onclick="activateApiKey('${keyObj.id}')" class="p-1.5 hover:bg-indigo-500/20 text-indigo-400 rounded-lg transition-colors" title="Activate">
+                        <i data-lucide="check" class="w-4 h-4"></i>
+                    </button>
+                ` : ''}
+                <button onclick="deleteApiKey('${keyObj.id}')" class="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors" title="Delete">
+                    <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+            </div>
+        `;
+        apiKeysList.appendChild(keyEl);
+    });
+    lucide.createIcons();
+}
+
+window.activateApiKey = (id) => {
+    apiKeys = apiKeys.map(k => ({ ...k, active: k.id === id }));
+    localStorage.setItem('studyhub_api_keys', JSON.stringify(apiKeys));
+    initGemini();
+    renderApiKeys();
+    showToast("API Key activated", "check");
+};
+
+window.deleteApiKey = (id) => {
+    if (apiKeys.length <= 1) {
+        showToast("Cannot delete the last API key", "alert-circle");
+        return;
+    }
+    const wasActive = apiKeys.find(k => k.id === id)?.active;
+    apiKeys = apiKeys.filter(k => k.id !== id);
+    if (wasActive && apiKeys.length > 0) {
+        apiKeys[0].active = true;
+    }
+    localStorage.setItem('studyhub_api_keys', JSON.stringify(apiKeys));
+    initGemini();
+    renderApiKeys();
+    showToast("API Key deleted", "trash-2");
+};
+
+function addApiKey() {
+    const key = newApiKeyInput.value.trim();
+    if (!key) return;
+    
+    const newKey = {
+        id: `key-${Date.now()}`,
+        key: key,
+        name: `Key ${apiKeys.length + 1}`,
+        active: false
+    };
+    
+    apiKeys.push(newKey);
+    localStorage.setItem('studyhub_api_keys', JSON.stringify(apiKeys));
+    newApiKeyInput.value = '';
+    renderApiKeys();
+    showToast("API Key added", "plus");
+}
+
+function saveAllSettings() {
+    settings.compactSidebar = document.getElementById('setting-compact-sidebar').checked;
+    
+    localStorage.setItem('studyhub_settings', JSON.stringify(settings));
+    
+    // Apply settings
+    if (settings.compactSidebar) {
+        sidebar.classList.add('minimized');
+    } else {
+        sidebar.classList.remove('minimized');
+    }
+    
+    showToast("Settings saved successfully", "save");
+    closeSettingsModal();
+}
+
+window.copyOfflinePath = function() {
     const input = document.getElementById('offline-path-input');
     copyToClipboard(input.value);
 }
@@ -311,95 +471,128 @@ function renderResources() {
         return;
     }
 
-    // Render Folders
-    folders.forEach((folder, index) => {
-        const folderEl = document.createElement('div');
-        folderEl.className = 'resource-card group relative bg-[#1e293b] rounded-2xl border border-slate-800 p-4 hover:border-indigo-500 transition-all cursor-pointer animate-fade-in';
-        folderEl.style.animationDelay = `${index * 0.05}s`;
-        folderEl.innerHTML = `
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-400">
-                    <i data-lucide="folder" class="w-6 h-6 fill-current"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <h3 class="font-bold text-slate-200 truncate">${folder.name}</h3>
-                    <p class="text-[10px] text-slate-500 truncate">${folder.description || 'Folder'}</p>
-                </div>
-                <button class="more-btn p-2 text-slate-500 hover:text-white rounded-lg hover:bg-slate-800 transition-colors relative z-10">
-                    <i data-lucide="more-vertical" class="w-4 h-4"></i>
-                </button>
-            </div>
-        `;
-        
-        folderEl.addEventListener('click', (e) => {
-            if (e.target.closest('.more-btn')) {
-                e.stopPropagation();
-                showContextMenu(e, folder, 'folder');
-            } else {
-                navigateToFolder(folder.id);
-            }
+    // Combine and Sort
+    let allItems = [
+        ...folders.map(f => ({ ...f, itemType: 'folder' })),
+        ...resources.map(r => ({ ...r, itemType: 'resource' }))
+    ];
+
+    // Apply Search Filter
+    if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        allItems = allItems.filter(item => {
+            const name = (item.name || item.title).toLowerCase();
+            const author = (item.author || '').toLowerCase();
+            const tags = (item.tags || []).join(' ').toLowerCase();
+            return name.includes(q) || author.includes(q) || tags.includes(q);
         });
-        
-        resourceGallery.appendChild(folderEl);
+    }
+
+    // Apply Sorting
+    allItems.sort((a, b) => {
+        // Pinning first
+        if (a.is_pinned && !b.is_pinned) return -1;
+        if (!a.is_pinned && b.is_pinned) return 1;
+
+        if (currentSort === 'folders') {
+            if (a.itemType === 'folder' && b.itemType !== 'folder') return -1;
+            if (a.itemType !== 'folder' && b.itemType === 'folder') return 1;
+        }
+
+        if (currentSort === 'az') {
+            const nameA = (a.name || a.title).toLowerCase();
+            const nameB = (b.name || b.title).toLowerCase();
+            return nameA.localeCompare(nameB);
+        }
+
+        // Default: Newest First
+        return new Date(b.created_at) - new Date(a.created_at);
     });
 
-    // Render Resources
-    resources.forEach((res, index) => {
-        const resEl = document.createElement('div');
-        resEl.className = 'resource-card group relative bg-[#1e293b] rounded-2xl border border-slate-800 p-4 hover:border-indigo-500 transition-all cursor-pointer animate-fade-in';
-        resEl.style.animationDelay = `${(folders.length + index) * 0.05}s`;
-        
-        const icon = getResourceIcon(res.type);
-        const displayUrl = res.link_url || '#';
-        const isLocalReference = res.link_url && res.link_url.startsWith('Local:');
-        const isOffline = res.is_offline || isLocalReference;
-        const isGoogleDrive = res.is_google_drive;
-        const isUploadedFile = res.link_url && (res.link_url.includes('supabase.co/storage') || res.link_url.startsWith('blob:'));
-        
-        const linkLabel = isLocalReference ? 'Local File' : (isGoogleDrive ? 'View in App' : (isUploadedFile ? 'View File' : 'Open Link'));
-        const linkIcon = isLocalReference ? 'hard-drive' : (isGoogleDrive ? 'file-text' : (isUploadedFile ? 'file' : 'external-link'));
-        
-        resEl.innerHTML = `
-            <div class="flex items-start gap-4">
-                <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-indigo-400 transition-colors">
-                    <i data-lucide="${icon}" class="w-6 h-6"></i>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center justify-between gap-2">
-                        <h3 class="font-bold text-slate-200 truncate">${res.title}</h3>
-                        <button class="more-btn p-1 text-slate-500 hover:text-white rounded transition-colors relative z-10">
-                            <i data-lucide="more-vertical" class="w-4 h-4"></i>
-                        </button>
-                    </div>
-                    <p class="text-xs text-slate-500 truncate mb-2">${res.author || 'Unknown'}</p>
-                    <div class="flex items-center gap-2">
-                        <span class="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
-                            <i data-lucide="${linkIcon}" class="w-3 h-3"></i>
-                            ${linkLabel}
-                        </span>
-                        <span class="text-[10px] text-slate-600">•</span>
-                        <span class="text-[10px] text-slate-500">${res.type}</span>
-                    </div>
-                </div>
-            </div>
-        `;
+    allItems.forEach((item, index) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = `resource-card group relative bg-[#1e293b] rounded-2xl border ${item.is_pinned ? 'border-indigo-500/50 bg-indigo-500/5' : 'border-slate-800'} p-4 hover:border-indigo-500 transition-all cursor-pointer animate-fade-in`;
+        itemEl.style.animationDelay = `${index * 0.05}s`;
 
-        resEl.addEventListener('click', (e) => {
-            if (e.target.closest('.more-btn')) {
-                e.stopPropagation();
-                showContextMenu(e, res, 'resource');
-            } else {
-                if (isLocalReference) {
-                    openOfflineModal(res.link_url);
-                } else if (isGoogleDrive || isUploadedFile) {
-                    openDriveViewer(res.link_url, res.title);
+        if (item.itemType === 'folder') {
+            itemEl.innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 bg-indigo-900/30 rounded-xl flex items-center justify-center text-indigo-400">
+                        <i data-lucide="folder" class="w-6 h-6 fill-current"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center gap-2">
+                            <h3 class="font-bold text-slate-200 truncate">${item.name}</h3>
+                            ${item.is_pinned ? '<i data-lucide="pin" class="w-3 h-3 text-indigo-400 rotate-45"></i>' : ''}
+                        </div>
+                        <p class="text-[10px] text-slate-500 truncate">${item.description || 'Folder'}</p>
+                    </div>
+                    <button class="more-btn p-2 text-slate-500 hover:text-white rounded-lg hover:bg-slate-800 transition-colors relative z-10">
+                        <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            `;
+            itemEl.addEventListener('click', (e) => {
+                if (e.target.closest('.more-btn')) {
+                    e.stopPropagation();
+                    showContextMenu(e, item, 'folder');
                 } else {
-                    window.open(displayUrl, '_blank');
+                    navigateToFolder(item.id);
                 }
-            }
-        });
+            });
+        } else {
+            const icon = getResourceIcon(item.type);
+            const displayUrl = item.link_url || '#';
+            const isLocalReference = item.link_url && item.link_url.startsWith('Local:');
+            const isGoogleDrive = item.is_google_drive;
+            const isUploadedFile = item.link_url && (item.link_url.includes('supabase.co/storage') || item.link_url.startsWith('blob:'));
+            
+            const linkLabel = isLocalReference ? 'Local File' : (isGoogleDrive ? 'View in App' : (isUploadedFile ? 'View File' : 'Open Link'));
+            const linkIcon = isLocalReference ? 'hard-drive' : (isGoogleDrive ? 'file-text' : (isUploadedFile ? 'file' : 'external-link'));
 
-        resourceGallery.appendChild(resEl);
+            itemEl.innerHTML = `
+                <div class="flex items-start gap-4">
+                    <div class="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center text-slate-400 group-hover:text-indigo-400 transition-colors">
+                        <i data-lucide="${icon}" class="w-6 h-6"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <h3 class="font-bold text-slate-200 truncate">${item.title}</h3>
+                                ${item.is_pinned ? '<i data-lucide="pin" class="w-3 h-3 text-indigo-400 rotate-45"></i>' : ''}
+                            </div>
+                            <button class="more-btn p-1 text-slate-500 hover:text-white rounded transition-colors relative z-10">
+                                <i data-lucide="more-vertical" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                        <p class="text-xs text-slate-500 truncate mb-2">${item.author || 'Unknown'}</p>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
+                                <i data-lucide="${linkIcon}" class="w-3 h-3"></i>
+                                ${linkLabel}
+                            </span>
+                            <span class="text-[10px] text-slate-600">•</span>
+                            <span class="text-[10px] text-slate-500">${item.type}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            itemEl.addEventListener('click', (e) => {
+                if (e.target.closest('.more-btn')) {
+                    e.stopPropagation();
+                    showContextMenu(e, item, 'resource');
+                } else {
+                    if (isLocalReference) {
+                        openOfflineModal(item.link_url);
+                    } else if (isGoogleDrive || isUploadedFile) {
+                        openDriveViewer(item.link_url, item.title);
+                    } else {
+                        window.open(displayUrl, '_blank');
+                    }
+                }
+            });
+        }
+        resourceGallery.appendChild(itemEl);
     });
 
     lucide.createIcons();
@@ -430,7 +623,7 @@ async function renderBreadcrumbs() {
     lucide.createIcons();
 }
 
-function navigateToFolder(id) {
+window.navigateToFolder = function(id) {
     currentFolderId = id;
     fetchResources();
 }
@@ -441,6 +634,14 @@ function showContextMenu(e, item, type) {
     contextMenu.style.display = 'block';
     contextMenu.style.left = `${e.clientX}px`;
     contextMenu.style.top = `${e.clientY}px`;
+    
+    // Update Pin text
+    const pinBtn = document.getElementById('ctx-pin');
+    pinBtn.innerHTML = `
+        <i data-lucide="${item.is_pinned ? 'pin-off' : 'pin'}" class="w-4 h-4"></i>
+        ${item.is_pinned ? 'Unpin from Top' : 'Pin to Top'}
+    `;
+    lucide.createIcons();
     
     // Adjust position if it goes off screen
     const menuRect = contextMenu.getBoundingClientRect();
@@ -454,6 +655,49 @@ function showContextMenu(e, item, type) {
 
 function hideContextMenu() {
     contextMenu.style.display = 'none';
+}
+
+async function togglePin() {
+    if (!contextMenuItem) return;
+    const { id, itemType, is_pinned } = contextMenuItem;
+    const newPinnedStatus = !is_pinned;
+
+    try {
+        if (supabaseClient) {
+            const table = itemType === 'folder' ? 'folders' : 'resources';
+            const { error } = await supabaseClient.from(table).update({ is_pinned: newPinnedStatus }).eq('id', id);
+            if (error) {
+                console.error("Supabase Pin Error:", error);
+                throw error;
+            }
+        }
+        
+        // Update local state
+        if (itemType === 'folder') {
+            folders = folders.map(f => f.id === id ? { ...f, is_pinned: newPinnedStatus } : f);
+            localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+        } else {
+            resources = resources.map(r => r.id === id ? { ...r, is_pinned: newPinnedStatus } : r);
+            localStorage.setItem('studyhub_resources', JSON.stringify(resources));
+        }
+        
+        showToast(newPinnedStatus ? "Pinned to Cloud" : "Unpinned from Cloud", "pin");
+        renderResources();
+    } catch (err) {
+        console.error("Pin operation failed:", err);
+        // Fallback to local if cloud fails
+        if (itemType === 'folder') {
+            folders = folders.map(f => f.id === id ? { ...f, is_pinned: newPinnedStatus } : f);
+            localStorage.setItem('studyhub_folders', JSON.stringify(folders));
+        } else {
+            resources = resources.map(r => r.id === id ? { ...r, is_pinned: newPinnedStatus } : r);
+            localStorage.setItem('studyhub_resources', JSON.stringify(resources));
+        }
+        showToast(newPinnedStatus ? "Pinned (Local Only)" : "Unpinned (Local Only)", "alert-circle");
+        renderResources();
+    } finally {
+        hideContextMenu();
+    }
 }
 
 // Actions
@@ -726,6 +970,28 @@ async function handleFolderSubmit(e) {
 }
 
 // Chat Logic
+window.setChatMode = function(mode) {
+    chatMode = mode;
+    if (mode === 'local') {
+        modeIcon.setAttribute('data-lucide', 'library');
+        modeText.textContent = 'Local Library';
+        chatInput.placeholder = 'Search your library...';
+    } else {
+        modeIcon.setAttribute('data-lucide', 'globe');
+        modeText.textContent = 'Web Search';
+        chatInput.placeholder = 'Search the web...';
+    }
+    chatModeMenu.classList.add('hidden');
+    lucide.createIcons();
+}
+
+function toggleMaximizeChat() {
+    isChatMaximized = !isChatMaximized;
+    chatWidget.classList.toggle('chat-maximized', isChatMaximized);
+    maximizeChatBtn.innerHTML = `<i data-lucide="${isChatMaximized ? 'minimize-2' : 'maximize-2'}" class="w-4 h-4"></i>`;
+    lucide.createIcons();
+}
+
 function addMessage(text, isUser = false) {
     const msgDiv = document.createElement('div');
     msgDiv.className = `flex gap-2 ${isUser ? 'flex-row-reverse' : ''} animate-fade-in`;
@@ -756,11 +1022,11 @@ async function handleChat() {
         <div class="w-8 h-8 rounded-lg bg-indigo-900/50 flex items-center justify-center shrink-0">
             <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i>
         </div>
-        <div class="bg-[#1e293b] text-slate-300 rounded-2xl rounded-tl-none border border-slate-800 p-3 text-sm shadow-sm max-w-[80%] bot-content">
-            <div class="flex items-center gap-2">
-                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce"></div>
-                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-                <div class="w-1 h-1 bg-indigo-400 rounded-full animate-bounce [animation-delay:0.4s]"></div>
+        <div class="bg-[#1e293b] text-slate-300 rounded-2xl rounded-tl-none border border-slate-800 p-3 text-sm shadow-sm max-w-[80%] bot-content leading-relaxed">
+            <div class="typing-indicator">
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
+                <div class="typing-dot"></div>
             </div>
         </div>
     `;
@@ -771,9 +1037,14 @@ async function handleChat() {
     const botContent = botMsgDiv.querySelector('.bot-content');
 
     try {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
-            throw new Error("Gemini API Key is missing. Please set it in your environment.");
+        const activeKey = getActiveApiKey();
+        if (!activeKey) {
+            throw new Error("Gemini API Key is missing. Please add one in Settings.");
         }
+        
+        if (!ai) initGemini();
+        if (!ai) throw new Error("Failed to initialize Gemini AI.");
+        
         // Fetch ALL resources and folders for context
         let allRes = resources;
         let allFolders = folders;
@@ -786,7 +1057,7 @@ async function handleChat() {
         }
         
         const context = `
-            You are a helpful Study Assistant for StudyHub. 
+            You are a professional Study Assistant for StudyHub. 
             You have access to the user's study resources and folders.
             
             Current Resources:
@@ -795,15 +1066,23 @@ async function handleChat() {
             Current Folders:
             ${(allFolders || []).map(f => `- ${f.name}: ${f.description || 'No description'}`).join('\n')}
             
-            Answer the user's questions based on these resources. If they ask about a specific book or video, check if it exists in their library.
-            Be concise and professional.
+            Search Mode: ${chatMode === 'web' ? 'Internet Search Enabled' : 'Local Library Only'}
+
+            Answer the user's questions based on the selected mode. 
+            If in Local Library mode, strictly use the provided resources. 
+            If in Web Search mode, you can use Google Search to find external information.
+            
+            Be concise, professional, and helpful. Use markdown for formatting.
         `;
+
+        const tools = chatMode === 'web' ? [{ googleSearch: {} }] : [];
 
         const response = await ai.models.generateContentStream({
             model: "gemini-3.1-flash-lite-preview",
             contents: [{ role: 'user', parts: [{ text }] }],
             config: {
-                systemInstruction: context
+                systemInstruction: context,
+                tools: tools
             }
         });
 
@@ -815,6 +1094,19 @@ async function handleChat() {
             fullText += chunkText;
             // Simple markdown-ish bolding for better readability
             botContent.innerHTML = fullText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Extract and show grounding URLs if any
+            const groundingChunks = chunk.candidates?.[0]?.groundingMetadata?.groundingChunks;
+            if (groundingChunks) {
+                const links = groundingChunks
+                    .filter(c => c.web)
+                    .map(c => `<a href="${c.web.uri}" target="_blank" class="text-indigo-400 hover:underline block text-[10px] truncate">${c.web.title || c.web.uri}</a>`)
+                    .join('');
+                if (links && !botContent.querySelector('.grounding-links')) {
+                    botContent.innerHTML += `<div class="mt-2 pt-2 border-t border-slate-800 grounding-links">${links}</div>`;
+                }
+            }
+            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
     } catch (err) {
@@ -823,63 +1115,18 @@ async function handleChat() {
     }
 }
 
-// Timer Logic
-function updateTimerDisplay() {
-    const minutes = Math.floor(studyTimeRemaining / 60);
-    const seconds = studyTimeRemaining % 60;
-    timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-}
-
-function toggleTimer() {
-    if (studyTimerInterval) {
-        // Stop
-        clearInterval(studyTimerInterval);
-        studyTimerInterval = null;
-        timerToggle.textContent = 'Start';
-        timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
-        timerToggle.classList.replace('hover:bg-red-700', 'hover:bg-indigo-700');
-    } else {
-        // Start
-        if (studyTimeRemaining <= 0) studyTimeRemaining = 25 * 60;
-        timerToggle.textContent = 'Stop';
-        timerToggle.classList.replace('bg-indigo-600', 'bg-red-600');
-        timerToggle.classList.replace('hover:bg-indigo-700', 'hover:bg-red-700');
-        
-        studyTimerInterval = setInterval(() => {
-            studyTimeRemaining--;
-            updateTimerDisplay();
-            if (studyTimeRemaining <= 0) {
-                clearInterval(studyTimerInterval);
-                studyTimerInterval = null;
-                timerToggle.textContent = 'Start';
-                timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
-                showToast("Focus session complete! Take a break.", "coffee");
-                // Play a subtle sound if possible or just visual feedback
-            }
-        }, 1000);
-    }
-}
-
-function resetTimer() {
-    clearInterval(studyTimerInterval);
-    studyTimerInterval = null;
-    studyTimeRemaining = 25 * 60;
-    updateTimerDisplay();
-    timerToggle.textContent = 'Start';
-    timerToggle.classList.replace('bg-red-600', 'bg-indigo-600');
-}
-
-// Event Listeners
-timerToggle.addEventListener('click', toggleTimer);
-timerReset.addEventListener('click', resetTimer);
-
 // Insight Logic
 async function fetchDailyInsight() {
     insightText.classList.add('opacity-50');
     try {
-        if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE') {
+        const activeKey = getActiveApiKey();
+        if (!activeKey) {
             throw new Error("API Key missing");
         }
+        
+        if (!ai) initGemini();
+        if (!ai) throw new Error("Failed to initialize Gemini AI.");
+
         const prompt = "Generate a short, inspiring study tip or motivational quote for a student. Max 100 characters.";
         const response = await ai.models.generateContent({
             model: "gemini-3.1-flash-lite-preview",
@@ -899,18 +1146,47 @@ async function fetchDailyInsight() {
 // Event Listeners
 refreshInsightBtn.addEventListener('click', fetchDailyInsight);
 
-// Initialize Timer
-studyTimeRemaining = 25 * 60;
-updateTimerDisplay();
+// Initialize
 fetchDailyInsight();
 
-quickAddToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    quickAddMenu.classList.toggle('active');
-});
+const resourceSort = document.getElementById('resource-sort');
+if (resourceSort) {
+    resourceSort.addEventListener('change', (e) => {
+        currentSort = e.target.value;
+        renderResources();
+    });
+}
+
+document.getElementById('ctx-pin').addEventListener('click', togglePin);
+
+if (globalSearchInput) {
+    globalSearchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderResources();
+    });
+}
+
+if (maximizeChatBtn) {
+    maximizeChatBtn.addEventListener('click', toggleMaximizeChat);
+}
+
+if (chatModeToggle) {
+    chatModeToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        chatModeMenu.classList.toggle('hidden');
+    });
+}
+
+if (quickAddToggle) {
+    quickAddToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        quickAddMenu.classList.toggle('active');
+    });
+}
 
 document.addEventListener('click', () => {
     quickAddMenu.classList.remove('active');
+    chatModeMenu.classList.add('hidden');
     hideContextMenu();
 });
 
@@ -1022,3 +1298,46 @@ window.closeDriveViewer = closeDriveViewer;
 window.closeOfflineModal = closeOfflineModal;
 window.copyOfflinePath = copyOfflinePath;
 window.selectFolderForMove = selectFolderForMove;
+window.closeSettingsModal = closeSettingsModal;
+window.openSettingsModal = openSettingsModal;
+window.setChatMode = setChatMode;
+
+// Settings Event Listeners
+if (openSettingsBtn) {
+    openSettingsBtn.addEventListener('click', openSettingsModal);
+}
+
+if (addApiKeyBtn) {
+    addApiKeyBtn.addEventListener('click', addApiKey);
+}
+
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveAllSettings);
+}
+
+if (clearCacheBtn) {
+    clearCacheBtn.addEventListener('click', () => {
+        if (confirm("Are you sure you want to clear all local data? This will remove your resources, folders, and settings.")) {
+            localStorage.clear();
+            window.location.reload();
+        }
+    });
+}
+
+if (exportDataBtn) {
+    exportDataBtn.addEventListener('click', () => {
+        const data = {
+            resources,
+            folders,
+            settings,
+            apiKeys
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `studyhub-backup-${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        showToast("Data exported successfully", "download");
+    });
+}

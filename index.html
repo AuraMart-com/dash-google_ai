@@ -83,29 +83,18 @@
                 </a>
             </nav>
 
-            <!-- Study Timer Widget -->
-            <div class="mx-4 mb-4 p-4 bg-slate-900/50 rounded-2xl border border-slate-800">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Focus Timer</span>
-                    <i data-lucide="timer" class="w-3 h-3 text-indigo-400"></i>
-                </div>
-                <div id="timer-display" class="text-2xl font-mono font-bold text-white text-center mb-3">25:00</div>
-                <div class="flex gap-2">
-                    <button id="timer-toggle" class="flex-1 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all">Start</button>
-                    <button id="timer-reset" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg transition-all">
-                        <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
-                    </button>
-                </div>
-            </div>
-
             <div class="p-4 border-t border-slate-800 sidebar-content">
-                <div class="flex items-center gap-3 px-3 py-2">
+                <div class="flex items-center gap-3 px-3 py-2 mb-2">
                     <img src="https://picsum.photos/seed/user/40/40" alt="User" class="w-8 h-8 rounded-full border border-slate-700" referrerPolicy="no-referrer">
                     <div class="flex-1 overflow-hidden">
-                        <p class="text-sm font-medium truncate text-slate-200">Jashuva</p>
-                        <p class="text-xs text-slate-500 truncate">Pro Student</p>
+                        <p class="text-sm font-medium truncate text-slate-200">Student</p>
+                        <p class="text-xs text-slate-500 truncate">Pro Member</p>
                     </div>
                 </div>
+                <button id="open-settings" class="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span>Settings</span>
+                </button>
             </div>
         </aside>
 
@@ -119,27 +108,10 @@
                 <div class="flex-1 max-w-xl">
                     <div class="relative">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500"></i>
-                        <input type="text" placeholder="Global Search (Books, Videos, Notes...)" class="w-full pl-10 pr-4 py-2 bg-slate-900 border-transparent focus:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-sm transition-all outline-none text-slate-200">
+                        <input id="global-search" type="text" placeholder="Search your library..." class="w-full pl-10 pr-4 py-2 bg-slate-900 border-transparent focus:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-sm transition-all outline-none text-slate-200">
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
-                    <div class="relative">
-                        <button id="quick-add-toggle" class="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-medium hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/20">
-                            <i data-lucide="plus" class="w-4 h-4"></i>
-                            <span class="quick-add-text">Quick Add</span>
-                            <i data-lucide="chevron-down" class="w-3 h-3 ml-1"></i>
-                        </button>
-                        <div id="quick-add-menu" class="dropdown-menu">
-                            <button onclick="openModal()" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2 rounded-lg">
-                                <i data-lucide="file-plus" class="w-4 h-4"></i>
-                                Add Resource
-                            </button>
-                            <button onclick="openFolderModal()" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2 rounded-lg">
-                                <i data-lucide="folder-plus" class="w-4 h-4"></i>
-                                Add Folder
-                            </button>
-                        </div>
-                    </div>
                     <button class="p-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors">
                         <i data-lucide="bell" class="w-5 h-5"></i>
                     </button>
@@ -169,12 +141,43 @@
                     <!-- Center: Resource Gallery -->
                     <section class="lg:col-span-8 space-y-6">
                         <div class="flex flex-col gap-4">
-                            <div class="flex items-center justify-between">
-                                <h2 class="text-lg font-bold text-white">Resource Gallery</h2>
-                                <div class="flex gap-2">
-                                    <button class="px-3 py-1 text-xs font-medium bg-slate-800 border border-slate-700 rounded-lg hover:bg-slate-700 text-slate-300">All</button>
-                                    <button class="px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-300">Books</button>
-                                    <button class="px-3 py-1 text-xs font-medium text-slate-500 hover:text-slate-300">Videos</button>
+                            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <h2 class="text-sm sm:text-lg font-bold text-white">Resource Gallery</h2>
+                                <div class="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                                    <div class="flex items-center gap-2 sm:gap-3 overflow-x-auto pb-1 sm:pb-0 no-scrollbar flex-1">
+                                        <div class="flex shrink-0 gap-1 bg-slate-900/50 p-1 rounded-xl border border-slate-800">
+                                            <button class="px-2 sm:px-3 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-slate-800 text-indigo-400 rounded-lg shadow-sm">All</button>
+                                            <button class="px-2 sm:px-3 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors">Books</button>
+                                            <button class="px-2 sm:px-3 py-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors">Videos</button>
+                                        </div>
+                                        
+                                        <div class="h-6 w-px bg-slate-800 mx-0.5 sm:mx-1 shrink-0"></div>
+                                        
+                                        <div class="flex items-center gap-2 shrink-0">
+                                            <select id="resource-sort" class="bg-slate-900 border border-slate-800 text-slate-400 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider rounded-lg px-2 py-1 outline-none focus:border-indigo-500 transition-all">
+                                                <option value="newest">Newest First</option>
+                                                <option value="az">A - Z</option>
+                                                <option value="folders">Folders First</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="relative shrink-0">
+                                        <button id="quick-add-toggle" class="flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-900/20">
+                                            <i data-lucide="plus" class="w-4 h-4 sm:w-3 sm:h-3"></i>
+                                            <span class="hidden sm:inline">Quick Add</span>
+                                        </button>
+                                        <div id="quick-add-menu" class="dropdown-menu right-0 mt-2">
+                                            <button onclick="openModal()" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2 rounded-lg">
+                                                <i data-lucide="file-plus" class="w-4 h-4"></i>
+                                                Add Resource
+                                            </button>
+                                            <button onclick="openFolderModal()" class="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-800 flex items-center gap-2 rounded-lg">
+                                                <i data-lucide="folder-plus" class="w-4 h-4"></i>
+                                                Add Folder
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             
@@ -195,31 +198,6 @@
 
                     <!-- Right: Study Stats & Quick Tasks -->
                     <section class="lg:col-span-4 space-y-8">
-                        <div class="bg-[#1e293b] p-6 rounded-2xl border border-slate-800 shadow-sm">
-                            <h3 class="text-sm font-bold text-white mb-4">Study Progress</h3>
-                            <div class="space-y-4">
-                                <div>
-                                    <div class="flex justify-between text-xs mb-1">
-                                        <span class="text-slate-500">Weekly Goal</span>
-                                        <span class="font-medium text-slate-300">75%</span>
-                                    </div>
-                                    <div class="w-full h-2 bg-slate-900 rounded-full overflow-hidden">
-                                        <div class="h-full bg-indigo-500 w-[75%]"></div>
-                                    </div>
-                                </div>
-                                <div class="grid grid-cols-2 gap-4 pt-2">
-                                    <div class="text-center p-3 bg-slate-900/50 rounded-xl border border-slate-800">
-                                        <p class="text-lg font-bold text-indigo-400">12</p>
-                                        <p class="text-[10px] uppercase tracking-wide text-slate-500">Hours</p>
-                                    </div>
-                                    <div class="text-center p-3 bg-slate-900/50 rounded-xl border border-slate-800">
-                                        <p class="text-lg font-bold text-emerald-400">4</p>
-                                        <p class="text-[10px] uppercase tracking-wide text-slate-500">Completed</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="space-y-4">
                             <h3 class="text-sm font-bold text-white">Upcoming Tasks</h3>
                             <div class="space-y-3">
@@ -247,26 +225,52 @@
                     <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
                     <span class="text-sm font-bold">Study Assistant</span>
                 </div>
-                <button id="close-chat" class="p-1 hover:bg-indigo-500 rounded transition-colors">
-                    <i data-lucide="minus" class="w-4 h-4"></i>
-                </button>
+                <div class="flex items-center gap-1">
+                    <button id="maximize-chat" class="p-1 hover:bg-indigo-500 rounded transition-colors" title="Toggle Maximize">
+                        <i data-lucide="maximize-2" class="w-4 h-4"></i>
+                    </button>
+                    <button id="close-chat" class="p-1 hover:bg-indigo-500 rounded transition-colors">
+                        <i data-lucide="minus" class="w-4 h-4"></i>
+                    </button>
+                </div>
             </div>
-            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50">
+            <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-900/50 scrollbar-thin">
                 <div class="flex gap-2">
                     <div class="w-8 h-8 rounded-lg bg-indigo-900/50 flex items-center justify-center shrink-0">
                         <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i>
                     </div>
-                    <div class="bg-[#1e293b] p-3 rounded-2xl rounded-tl-none border border-slate-800 text-sm shadow-sm text-slate-300">
+                    <div class="bg-[#1e293b] p-3 rounded-2xl rounded-tl-none border border-slate-800 text-sm shadow-sm text-slate-300 leading-relaxed">
                         Hello! I'm your Study Assistant. How can I help you with your research today?
                     </div>
                 </div>
             </div>
             <div class="p-4 border-t border-slate-800 bg-[#1e293b]">
-                <div class="relative">
-                    <input id="chat-input" type="text" placeholder="Ask anything..." class="w-full pl-4 pr-10 py-2 bg-slate-900 border-transparent focus:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-sm outline-none transition-all text-slate-200">
-                    <button id="send-chat" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
-                        <i data-lucide="send" class="w-4 h-4"></i>
-                    </button>
+                <div class="flex flex-col gap-2">
+                    <div class="flex items-center justify-between px-1">
+                        <div class="relative">
+                            <button id="chat-mode-toggle" class="flex items-center gap-1.5 px-2 py-1 bg-slate-900 border border-slate-800 rounded-lg text-[10px] font-bold uppercase tracking-wider text-slate-400 hover:text-indigo-400 transition-all">
+                                <i data-lucide="library" class="w-3 h-3" id="mode-icon"></i>
+                                <span id="mode-text">Local Library</span>
+                                <i data-lucide="chevron-up" class="w-2.5 h-2.5"></i>
+                            </button>
+                            <div id="chat-mode-menu" class="absolute bottom-full left-0 mb-2 w-40 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden hidden animate-in slide-in-from-bottom-2 duration-200">
+                                <button onclick="setChatMode('local')" class="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2 transition-colors">
+                                    <i data-lucide="library" class="w-4 h-4 text-indigo-400"></i>
+                                    Local Library
+                                </button>
+                                <button onclick="setChatMode('web')" class="w-full text-left px-4 py-2.5 text-xs text-slate-300 hover:bg-slate-800 flex items-center gap-2 transition-colors">
+                                    <i data-lucide="globe" class="w-4 h-4 text-emerald-400"></i>
+                                    Web Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="relative">
+                        <input id="chat-input" type="text" placeholder="Ask anything..." class="w-full pl-4 pr-10 py-2.5 bg-slate-900 border-transparent focus:bg-slate-800 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-sm outline-none transition-all text-slate-200">
+                        <button id="send-chat" class="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 text-indigo-400 hover:bg-indigo-500/10 rounded-lg transition-colors">
+                            <i data-lucide="send" class="w-4 h-4"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -304,6 +308,83 @@
                         <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
                         <p class="text-xs text-slate-400 font-medium">Loading Document...</p>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settings-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[200] flex items-center justify-center opacity-0 pointer-events-none transition-all duration-300">
+            <div class="bg-[#1e293b] w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform scale-95 transition-all duration-300 border border-slate-800 flex flex-col max-h-[90vh]" id="settings-modal-content">
+                <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-indigo-900/10 shrink-0">
+                    <div class="flex items-center gap-3">
+                        <i data-lucide="settings" class="w-6 h-6 text-indigo-400"></i>
+                        <h3 class="text-lg font-bold text-white">Application Settings</h3>
+                    </div>
+                    <button onclick="closeSettingsModal()" class="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+                
+                <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                    <!-- API Settings Section -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="key" class="w-4 h-4 text-indigo-400"></i>
+                            <h4 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Gemini API Configuration</h4>
+                        </div>
+                        <p class="text-xs text-slate-500">Manage your Gemini API keys for the study assistant. These keys are stored locally in your browser.</p>
+                        
+                        <div class="space-y-3">
+                            <div class="flex gap-2">
+                                <input type="password" id="new-api-key" placeholder="Enter Gemini API Key..." class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all text-slate-200">
+                                <button id="add-api-key" class="px-4 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all flex items-center gap-2">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                    Add Key
+                                </button>
+                            </div>
+                            
+                            <div id="api-keys-list" class="space-y-2">
+                                <!-- API keys will be listed here -->
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Appearance Section -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="palette" class="w-4 h-4 text-indigo-400"></i>
+                            <h4 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Appearance & Theme</h4>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800 flex items-center justify-between">
+                                <span class="text-sm text-slate-300">Compact Sidebar</span>
+                                <input type="checkbox" id="setting-compact-sidebar" class="w-4 h-4 rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-500">
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Data Management -->
+                    <section class="space-y-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <i data-lucide="database" class="w-4 h-4 text-indigo-400"></i>
+                            <h4 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Data Management</h4>
+                        </div>
+                        <div class="flex gap-3">
+                            <button id="export-data" class="flex-1 py-2.5 bg-slate-800 text-slate-300 rounded-xl text-sm font-bold hover:bg-slate-700 transition-all flex items-center justify-center gap-2">
+                                <i data-lucide="download" class="w-4 h-4"></i>
+                                Export Data
+                            </button>
+                            <button id="clear-cache" class="flex-1 py-2.5 bg-red-500/10 text-red-500 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-all flex items-center justify-center gap-2">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                Clear Local Cache
+                            </button>
+                        </div>
+                    </section>
+                </div>
+                
+                <div class="p-6 border-t border-slate-800 bg-slate-900/30 shrink-0 flex justify-end gap-3">
+                    <button onclick="closeSettingsModal()" class="px-6 py-2.5 bg-slate-800 text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-700 transition-all">Close</button>
+                    <button id="save-settings" class="px-8 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-900/20">Save All Changes</button>
                 </div>
             </div>
         </div>
@@ -459,6 +540,10 @@
 
         <!-- Context Menu -->
         <div id="context-menu" class="context-menu">
+            <div class="context-menu-item" id="ctx-pin">
+                <i data-lucide="pin" class="w-4 h-4"></i>
+                Pin to Top
+            </div>
             <div class="context-menu-item" id="ctx-edit">
                 <i data-lucide="edit-3" class="w-4 h-4"></i>
                 Edit
