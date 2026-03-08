@@ -6,25 +6,7 @@ lucide.createIcons();
 import { GoogleGenAI } from "@google/genai";
 
 // Fallback for environment variables in static hosting
-const getEnv = (key) => {
-    try {
-        // Try localStorage first (user-provided override)
-        const localValue = localStorage.getItem(`STUDYHUB_${key}`);
-        if (localValue) return localValue;
-
-        // Try Vite's import.meta.env
-        if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
-            return import.meta.env[key];
-        }
-        // Try process.env (for some build tools)
-        if (typeof process !== 'undefined' && process.env && process.env[key]) {
-            return process.env[key];
-        }
-    } catch (e) {}
-    return null;
-};
-
-const GEMINI_API_KEY = getEnv('VITE_GEMINI_API_KEY') || getEnv('GEMINI_API_KEY') || 'YOUR_GEMINI_API_KEY_HERE';
+const GEMINI_API_KEY = 'AIzaSyASIew7fF7UigK7BqgGHOFLim9j67URVkM';
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
 // Supabase Configuration
@@ -46,16 +28,13 @@ try {
 // State
 let resources = [];
 let folders = [];
-let newsItems = [];
 let currentFolderId = null;
 let activeInputMode = 'url'; // 'url' or 'file'
 let contextMenuItem = null; // Stores the item currently targeted by context menu
-let currentNewsFilter = 'all';
 let studyTimerInterval = null;
 let studyTimeRemaining = 0; // in seconds
 
 // DOM Elements
-const newsFeed = document.getElementById('news-feed');
 const insightText = document.getElementById('insight-text');
 const refreshInsightBtn = document.getElementById('refresh-insight');
 const timerDisplay = document.getElementById('timer-display');
@@ -74,7 +53,6 @@ const quickAddMenu = document.getElementById('quick-add-menu');
 const addModal = document.getElementById('add-modal');
 const folderModal = document.getElementById('folder-modal');
 const moveModal = document.getElementById('move-modal');
-const newsModal = document.getElementById('news-modal');
 const deleteModal = document.getElementById('delete-modal');
 const addResourceForm = document.getElementById('add-resource-form');
 const addFolderForm = document.getElementById('add-folder-form');
@@ -100,21 +78,6 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
 const sidebarClose = document.getElementById('sidebar-close');
 const sidebarOverlay = document.getElementById('sidebar-overlay');
-const passwordModal = document.getElementById('password-modal');
-const apiManagerModal = document.getElementById('api-manager-modal');
-const accessPasswordInput = document.getElementById('access-password');
-const managerNewsKeyInput = document.getElementById('manager-news-key');
-const managerGeminiKeyInput = document.getElementById('manager-gemini-key');
-
-function saveNewsKeyFromUI() {
-    const input = document.getElementById('news-api-key-input');
-    const key = input.value.trim();
-    if (key) {
-        window.setNewsApiKey(key);
-    } else {
-        showToast("Please enter a valid key", "alert-circle");
-    }
-}
 
 // Sidebar Toggle
 if (sidebarToggle) {
@@ -140,94 +103,6 @@ if (sidebarOverlay) {
         sidebar.classList.remove('open');
         sidebarOverlay.classList.remove('active');
     });
-}
-
-// API Management Functions
-function openPasswordModal() {
-    passwordModal.classList.remove('hidden');
-    accessPasswordInput.value = '';
-    accessPasswordInput.focus();
-}
-
-function closePasswordModal() {
-    passwordModal.classList.add('hidden');
-}
-
-function checkPassword() {
-    const password = accessPasswordInput.value.trim();
-    if (password === 'gnewsyt.com') {
-        closePasswordModal();
-        openApiManager();
-    } else {
-        showToast("Incorrect password", "alert-circle");
-        accessPasswordInput.value = '';
-        accessPasswordInput.focus();
-    }
-}
-
-function openApiManager() {
-    apiManagerModal.classList.remove('hidden');
-    managerNewsKeyInput.value = localStorage.getItem('STUDYHUB_VITE_NEWS_API_KEY') || '';
-    managerGeminiKeyInput.value = localStorage.getItem('STUDYHUB_VITE_GEMINI_API_KEY') || '';
-}
-
-function closeApiManager() {
-    apiManagerModal.classList.add('hidden');
-}
-
-function saveManagerKey(type) {
-    if (type === 'news') {
-        const key = managerNewsKeyInput.value.trim();
-        if (key) {
-            localStorage.setItem('STUDYHUB_VITE_NEWS_API_KEY', key);
-            showToast("News API Key updated", "check");
-            setTimeout(() => location.reload(), 1000);
-        }
-    } else if (type === 'gemini') {
-        const key = managerGeminiKeyInput.value.trim();
-        if (key) {
-            localStorage.setItem('STUDYHUB_VITE_GEMINI_API_KEY', key);
-            showToast("Gemini API Key updated", "check");
-            setTimeout(() => location.reload(), 1000);
-        }
-    }
-}
-
-function deleteManagerKey(type) {
-    if (type === 'news') {
-        localStorage.removeItem('STUDYHUB_VITE_NEWS_API_KEY');
-        managerNewsKeyInput.value = '';
-        showToast("News API Key deleted", "trash-2");
-    } else if (type === 'gemini') {
-        localStorage.removeItem('STUDYHUB_VITE_GEMINI_API_KEY');
-        managerGeminiKeyInput.value = '';
-        showToast("Gemini API Key deleted", "trash-2");
-    }
-}
-
-async function testNewsKey() {
-    const key = managerNewsKeyInput.value.trim();
-    if (!key) {
-        showToast("Enter a key to test", "alert-circle");
-        return;
-    }
-    
-    showToast("Testing key...", "loader");
-    const url = `/api/news?q=test&apikey=${key}`;
-    
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        if (response.ok) {
-            showToast("Key is VALID! Connection successful.", "check-circle");
-        } else {
-            const msg = data.errors ? data.errors[0] : (data.message || "Invalid key");
-            showToast(`Error: ${msg}`, "alert-triangle");
-        }
-    } catch (e) {
-        showToast("Network error during test", "alert-circle");
-    }
 }
 
 // Functions
@@ -307,250 +182,6 @@ function closeOfflineModal() {
     modal.classList.add('hidden');
     modal.classList.remove('flex');
 }
-
-function openNewsModal() {
-    newsModal.classList.add('active');
-    fetchNews();
-}
-
-function closeNewsModal() {
-    newsModal.classList.remove('active');
-}
-
-const NEWS_API_KEY = getEnv('VITE_NEWS_API_KEY') || getEnv('NEWS_API_KEY');
-
-async function fetchNews() {
-    const newsFeed = document.getElementById('news-feed');
-    
-    // Show loading state
-    newsFeed.innerHTML = `
-        <div class="flex flex-col items-center justify-center py-40">
-            <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-        </div>
-    `;
-
-    if (!NEWS_API_KEY || NEWS_API_KEY === 'YOUR_NEWS_API_KEY_HERE') {
-        newsFeed.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
-                <div class="w-16 h-16 bg-amber-500/10 rounded-full flex items-center justify-center mb-2">
-                    <i data-lucide="key" class="w-8 h-8 text-amber-500"></i>
-                </div>
-                <h3 class="text-lg font-bold text-slate-200">API Key Required</h3>
-                <p class="text-slate-500 text-sm max-w-xs">To see real-time news, you need a free API key from <a href="https://gnews.io/" target="_blank" class="text-indigo-400 hover:underline font-medium">GNews.io</a>.</p>
-                
-                <div class="mt-6 w-full max-w-xs space-y-3">
-                    <div class="relative">
-                        <input type="password" id="news-api-key-input" placeholder="Paste your GNews API key here..." 
-                            class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
-                    </div>
-                    <button onclick="saveNewsKeyFromUI()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98]">
-                        Save & Refresh
-                    </button>
-                </div>
-
-                <div class="mt-8 pt-6 border-t border-slate-800/50 w-full max-w-xs">
-                    <p class="text-[10px] uppercase font-black text-slate-500 mb-2 tracking-wider">Developer Option</p>
-                    <code class="text-[11px] text-indigo-400/70 break-all bg-slate-900/50 p-2 rounded-lg block">setNewsApiKey('YOUR_KEY')</code>
-                </div>
-            </div>
-        `;
-        lucide.createIcons();
-        return;
-    }
-
-    // Map categories to GNews queries
-    let query = 'technology';
-    if (currentNewsFilter === 'cybersecurity') query = 'cybersecurity';
-    else if (currentNewsFilter === 'ai') query = '"artificial intelligence"';
-    else if (currentNewsFilter === 'hyderabad') query = 'hyderabad';
-    else if (currentNewsFilter === 'jobs') query = '"tech jobs"';
-    else if (currentNewsFilter === 'tech') query = 'technology';
-
-    // Use proxy in development/production server, direct call for static hosting (GitHub Pages)
-    const isStaticHost = window.location.hostname.includes('github.io') || 
-                        window.location.hostname.includes('github.com') || 
-                        window.location.protocol === 'file:';
-    
-    const url = isStaticHost 
-        ? `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=15&apikey=${NEWS_API_KEY}`
-        : `/api/news?q=${encodeURIComponent(query)}&apikey=${NEWS_API_KEY || ''}`;
-
-    try {
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (!response.ok) {
-            let errorMsg = "API limit reached or invalid key";
-            if (data.errors && data.errors[0]) errorMsg = data.errors[0];
-            else if (data.message) errorMsg = data.message;
-            throw new Error(errorMsg);
-        }
-        
-        if (!data.articles || data.articles.length === 0) {
-            throw new Error("No articles found for this category.");
-        }
-
-        newsItems = data.articles.map((article, index) => ({
-            id: `news-${index}-${Date.now()}`,
-            title: article.title,
-            summary: article.description,
-            category: currentNewsFilter,
-            date: article.publishedAt,
-            source: article.source.name,
-            url: article.url,
-            thumbnail: article.image
-        }));
-        
-        // Update Breaking News Ticker
-        const ticker = document.getElementById('breaking-news-ticker');
-        if (ticker && newsItems.length > 0) {
-            ticker.textContent = newsItems.map(item => item.title).join(' • ');
-        }
-        
-        renderNews();
-    } catch (err) {
-        console.error("News API Error:", err);
-        newsFeed.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
-                <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-2">
-                    <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500"></i>
-                </div>
-                <h3 class="text-lg font-bold text-slate-200">Feed Unavailable</h3>
-                <p class="text-slate-500 text-sm max-w-xs">${err.message || "Could not connect to the news service."}</p>
-                <div class="flex gap-3 mt-4">
-                    <button onclick="fetchNews()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-2">
-                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Try Again
-                    </button>
-                    <button onclick="deleteManagerKey('news'); location.reload();" class="px-6 py-2.5 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded-xl font-bold text-sm transition-all">
-                        Reset API Key
-                    </button>
-                </div>
-            </div>
-        `;
-        lucide.createIcons();
-    }
-}
-
-function renderNews() {
-    const newsFeed = document.getElementById('news-feed');
-    newsFeed.innerHTML = '';
-    
-    const filtered = currentNewsFilter === 'all' 
-        ? newsItems 
-        : newsItems.filter(item => item.category === currentNewsFilter);
-
-    if (filtered.length === 0) {
-        newsFeed.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-20 gap-4">
-                <div class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center opacity-50">
-                    <i data-lucide="inbox" class="w-8 h-8 text-slate-500"></i>
-                </div>
-                <p class="text-slate-500 font-medium">No reports found in this category.</p>
-            </div>
-        `;
-        return;
-    }
-
-    // Editorial Header for the list
-    const sectionHeader = document.createElement('div');
-    sectionHeader.className = 'flex items-center justify-between mb-2 px-2';
-    sectionHeader.innerHTML = `
-        <span class="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Latest Reports</span>
-        <span class="text-[10px] font-bold text-slate-500 italic">Showing ${filtered.length} stories</span>
-    `;
-    newsFeed.appendChild(sectionHeader);
-
-    filtered.forEach((item, index) => {
-        const card = document.createElement('div');
-        card.className = 'group relative bg-slate-800/20 hover:bg-slate-800/40 border-b border-slate-800/50 last:border-0 transition-all duration-300 animate-fade-in';
-        card.style.animationDelay = `${index * 0.05}s`;
-        
-        const dateObj = new Date(item.date);
-        const timeAgo = formatTimeAgo(dateObj);
-        
-        // Validate URLs
-        const isValidArticleUrl = item.url && item.url.startsWith('http');
-        const articleUrl = isValidArticleUrl ? item.url : '#';
-        const thumbnail = item.thumbnail && item.thumbnail.startsWith('http') ? item.thumbnail : `https://picsum.photos/seed/${item.id}/600/400`;
-
-        card.innerHTML = `
-            <div class="flex flex-col md:flex-row gap-6 py-8 px-2">
-                <!-- Thumbnail with Editorial Overlay -->
-                <div class="w-full md:w-64 h-44 shrink-0 relative rounded-xl overflow-hidden shadow-2xl bg-slate-800">
-                    <img src="${thumbnail}" 
-                         onerror="this.onerror=null; this.src='https://picsum.photos/seed/${item.id}/600/400';" 
-                         alt="${item.title}" 
-                         class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" 
-                         referrerPolicy="no-referrer">
-                    <div class="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-transparent to-transparent opacity-60"></div>
-                    <div class="absolute top-3 left-3">
-                        <span class="px-2 py-1 bg-indigo-600 text-white rounded text-[9px] font-black uppercase tracking-widest shadow-xl">${item.category}</span>
-                    </div>
-                </div>
-                
-                <!-- Content -->
-                <div class="flex-1 flex flex-col">
-                    <div class="flex items-center gap-3 mb-3">
-                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-tighter">${item.source}</span>
-                        <div class="w-1 h-1 bg-slate-700 rounded-full"></div>
-                        <span class="text-[10px] text-slate-500 font-bold">${timeAgo}</span>
-                    </div>
-                    
-                    <h4 class="text-xl font-bold text-slate-100 mb-3 leading-tight group-hover:text-indigo-400 transition-colors">
-                        <a href="${articleUrl}" target="_blank" class="hover:underline decoration-indigo-500/30 underline-offset-4">${item.title}</a>
-                    </h4>
-                    
-                    <p class="text-sm text-slate-400 leading-relaxed mb-6 line-clamp-2 font-medium italic opacity-80">
-                        ${item.summary}
-                    </p>
-                    
-                    <div class="mt-auto flex items-center justify-between">
-                        <div class="flex items-center gap-4">
-                            <button class="text-slate-500 hover:text-indigo-400 transition-colors">
-                                <i data-lucide="bookmark" class="w-4 h-4"></i>
-                            </button>
-                            <button class="text-slate-500 hover:text-indigo-400 transition-colors">
-                                <i data-lucide="share-2" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                        <a href="${articleUrl}" target="_blank" class="group/btn inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-all ${!isValidArticleUrl ? 'pointer-events-none opacity-50' : ''}">
-                            Full Coverage 
-                            <i data-lucide="arrow-right" class="w-3 h-3 group-hover/btn:translate-x-1 transition-transform"></i>
-                        </a>
-                    </div>
-                </div>
-            </div>
-        `;
-        newsFeed.appendChild(card);
-    });
-    
-    lucide.createIcons();
-}
-
-function formatTimeAgo(date) {
-    const seconds = Math.floor((new Date() - date) / 1000);
-    let interval = Math.floor(seconds / 3600);
-    if (interval >= 1) return interval + "h ago";
-    interval = Math.floor(seconds / 60);
-    if (interval >= 1) return interval + "m ago";
-    return "Just now";
-}
-
-window.filterNews = (category) => {
-    if (currentNewsFilter === category) return;
-    currentNewsFilter = category;
-    document.querySelectorAll('.news-tab').forEach(tab => {
-        tab.classList.remove('active', 'bg-indigo-600', 'text-white');
-        tab.classList.add('text-slate-500');
-        const tabLabel = tab.textContent.toLowerCase().trim();
-        const categoryLabel = category.toLowerCase().trim();
-        if (tabLabel === categoryLabel || (category === 'all' && tabLabel === 'all')) {
-            tab.classList.add('active', 'bg-indigo-600', 'text-white');
-            tab.classList.remove('text-slate-500');
-        }
-    });
-    fetchNews();
-};
 
 function openDriveViewer(url, title) {
     viewerTitle.textContent = title;
@@ -1345,7 +976,6 @@ document.getElementById('ctx-edit').addEventListener('click', async () => {
     hideContextMenu();
 });
 
-document.getElementById('open-news-btn').addEventListener('click', openNewsModal);
 closeChatBtn.addEventListener('click', () => {
     chatWidget.classList.add('translate-y-full', 'opacity-0', 'pointer-events-none');
     openChatBtn.classList.remove('scale-0', 'opacity-0');
@@ -1369,21 +999,8 @@ window.closeModal = closeModal;
 window.openFolderModal = openFolderModal;
 window.closeFolderModal = closeFolderModal;
 window.closeMoveModal = closeMoveModal;
-window.closeNewsModal = closeNewsModal;
 window.closeDeleteModal = closeDeleteModal;
 window.closeDriveViewer = closeDriveViewer;
 window.closeOfflineModal = closeOfflineModal;
 window.copyOfflinePath = copyOfflinePath;
 window.selectFolderForMove = selectFolderForMove;
-window.fetchNews = fetchNews;
-window.openNewsModal = openNewsModal;
-window.filterNews = filterNews;
-window.saveNewsKeyFromUI = saveNewsKeyFromUI;
-window.openPasswordModal = openPasswordModal;
-window.closePasswordModal = closePasswordModal;
-window.checkPassword = checkPassword;
-window.openApiManager = openApiManager;
-window.closeApiManager = closeApiManager;
-window.saveManagerKey = saveManagerKey;
-window.deleteManagerKey = deleteManagerKey;
-window.testNewsKey = testNewsKey;

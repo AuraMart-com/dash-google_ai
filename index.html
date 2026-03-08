@@ -6,20 +6,6 @@
     <title>StudyHub - Your Professional Study Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
-    <script>
-        // Global Helpers for Console
-        window.setNewsApiKey = (key) => {
-            localStorage.setItem('STUDYHUB_VITE_NEWS_API_KEY', key);
-            alert('News API Key saved! Reloading...');
-            location.reload();
-        };
-        window.setGeminiApiKey = (key) => {
-            localStorage.setItem('STUDYHUB_VITE_GEMINI_API_KEY', key);
-            alert('Gemini API Key saved! Reloading...');
-            location.reload();
-        };
-        console.log("StudyHub Helpers Loaded. Use setNewsApiKey('your_key') in console.");
-    </script>
     <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Import Map for Gemini -->
@@ -95,10 +81,6 @@
                     <i data-lucide="check-square" class="w-5 h-5"></i>
                     <span>Task List</span>
                 </a>
-                <button id="open-news-btn" class="w-full flex items-center gap-3 px-3 py-2 text-slate-400 hover:bg-slate-800 rounded-lg transition-colors">
-                    <i data-lucide="rss" class="w-5 h-5"></i>
-                    <span>News</span>
-                </button>
             </nav>
 
             <!-- Study Timer Widget -->
@@ -123,9 +105,6 @@
                         <p class="text-sm font-medium truncate text-slate-200">Jashuva</p>
                         <p class="text-xs text-slate-500 truncate">Pro Student</p>
                     </div>
-                </div>
-                <div class="mt-2 px-3">
-                    <button onclick="openPasswordModal()" class="text-[10px] text-slate-600 hover:text-indigo-400 transition-colors uppercase font-bold tracking-widest">Change API</button>
                 </div>
             </div>
         </aside>
@@ -262,7 +241,7 @@
         </div>
 
         <!-- Floating Chat Widget -->
-        <div id="chat-widget" class="fixed bottom-6 right-6 w-80 bg-[#1e293b] rounded-2xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 translate-y-0 opacity-100 z-50 overflow-hidden" style="height: 450px;">
+        <div id="chat-widget" class="fixed bottom-6 right-6 w-80 bg-[#1e293b] rounded-2xl shadow-2xl border border-slate-800 flex flex-col transition-all duration-300 translate-y-full opacity-0 pointer-events-none z-50 overflow-hidden" style="height: 450px;">
             <div class="p-4 bg-indigo-600 text-white flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-2">
                     <div class="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></div>
@@ -293,7 +272,7 @@
         </div>
 
         <!-- Minimized Chat Trigger -->
-        <button id="open-chat" class="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all duration-300 scale-0 opacity-0 z-50">
+        <button id="open-chat" class="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-indigo-700 transition-all duration-300 scale-100 opacity-100 z-50">
             <i data-lucide="message-square" class="w-6 h-6"></i>
         </button>
 
@@ -341,62 +320,6 @@
                     <div class="flex gap-3">
                         <button onclick="closeDeleteModal()" class="flex-1 py-3 bg-slate-800 text-slate-300 rounded-xl font-bold text-sm hover:bg-slate-700 transition-all">Cancel</button>
                         <button id="confirm-delete-btn" class="flex-1 py-3 bg-red-600 text-white rounded-xl font-bold text-sm hover:bg-red-700 transition-all shadow-lg shadow-red-900/20">Delete</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- News Modal -->
-        <div id="news-modal" class="fixed inset-0 bg-[#0f172a] z-[500] flex flex-col opacity-0 pointer-events-none transition-all duration-300">
-            <div class="flex-1 flex flex-col h-full bg-[#0f172a]" id="news-modal-content">
-                <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-[#1e293b] shrink-0">
-                    <div class="flex items-center gap-6">
-                        <button onclick="closeNewsModal()" class="p-2 hover:bg-slate-800 rounded-xl transition-all text-slate-400 hover:text-white" title="Back to Dashboard">
-                            <i data-lucide="arrow-left" class="w-6 h-6"></i>
-                        </button>
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-900/40">
-                                <i data-lucide="newspaper" class="w-6 h-6"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-xl font-bold text-white">Global & Local News</h3>
-                                <p id="news-last-updated" class="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Live Intelligence Feed</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- News Categories -->
-                <div class="px-6 py-3 border-b border-slate-800 bg-slate-900/30 flex gap-2 overflow-x-auto no-scrollbar shrink-0">
-                    <button onclick="filterNews('all')" class="news-tab active px-4 py-1.5 rounded-full text-xs font-bold transition-all whitespace-nowrap">All</button>
-                    <button onclick="filterNews('cybersecurity')" class="news-tab px-4 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-300 transition-all whitespace-nowrap">Cybersecurity</button>
-                    <button onclick="filterNews('tech')" class="news-tab px-4 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-300 transition-all whitespace-nowrap">Tech</button>
-                    <button onclick="filterNews('ai')" class="news-tab px-4 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-300 transition-all whitespace-nowrap">AI/ML</button>
-                    <button onclick="filterNews('hyderabad')" class="news-tab px-4 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-300 transition-all whitespace-nowrap">Hyderabad</button>
-                    <button onclick="filterNews('jobs')" class="news-tab px-4 py-1.5 rounded-full text-xs font-bold text-slate-500 hover:text-slate-300 transition-all whitespace-nowrap">Jobs</button>
-                </div>
-
-                <!-- Breaking News Ticker -->
-                <div class="bg-indigo-600/10 border-b border-indigo-500/20 px-6 py-2 flex items-center gap-4 overflow-hidden shrink-0">
-                    <span class="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-indigo-400 whitespace-nowrap">
-                        <span class="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
-                        Breaking
-                    </span>
-                    <div class="flex-1 overflow-hidden">
-                        <div id="breaking-news-ticker" class="text-[11px] text-slate-300 font-bold italic whitespace-nowrap animate-marquee">
-                            Loading latest headlines from global tech hubs...
-                        </div>
-                    </div>
-                </div>
-
-                <div class="flex-1 overflow-y-auto p-8 custom-scrollbar bg-[#0f172a]">
-                    <div class="max-w-6xl mx-auto">
-                        <div id="news-feed" class="flex flex-col gap-6">
-                            <!-- News items will be injected here -->
-                            <div class="col-span-full flex flex-col items-center justify-center py-40">
-                                <div class="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -554,67 +477,6 @@
 
     <!-- Toast Container -->
     <div id="toast-container" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 pointer-events-none"></div>
-
-    <!-- Password Modal -->
-    <div id="password-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[600] hidden flex items-center justify-center p-4">
-        <div class="bg-[#1e293b] rounded-2xl shadow-xl w-full max-w-xs overflow-hidden border border-slate-800 animate-in fade-in zoom-in duration-200">
-            <div class="p-6 space-y-4">
-                <input type="password" id="access-password" placeholder="••••••••" 
-                    class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-center tracking-widest">
-                <div class="flex gap-2">
-                    <button onclick="closePasswordModal()" class="flex-1 py-2.5 bg-slate-800 text-slate-400 rounded-xl text-xs font-bold hover:bg-slate-700 transition-all">Cancel</button>
-                    <button onclick="checkPassword()" class="flex-1 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Verify</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- API Manager Modal -->
-    <div id="api-manager-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[600] hidden flex items-center justify-center p-4">
-        <div class="bg-[#1e293b] rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-slate-800 animate-in fade-in zoom-in duration-200">
-            <div class="p-6 border-b border-slate-800 flex items-center justify-between bg-indigo-900/10">
-                <h3 class="text-lg font-bold text-white">API Key Manager</h3>
-                <button onclick="closeApiManager()" class="p-2 hover:bg-slate-800 rounded-xl transition-colors text-slate-400 hover:text-white">
-                    <i data-lucide="x" class="w-5 h-5"></i>
-                </button>
-            </div>
-            <div class="p-6 space-y-6">
-                <div class="space-y-4">
-                    <div>
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">GNews API Key</label>
-                        <div class="flex gap-2">
-                            <input type="password" id="manager-news-key" placeholder="Enter News API Key..." 
-                                class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-200">
-                            <button onclick="saveManagerKey('news')" class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Save</button>
-                        </div>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="testNewsKey()" class="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-wider transition-colors mr-3">Test Connection</button>
-                            <button onclick="deleteManagerKey('news')" class="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider transition-colors">Delete Key</button>
-                        </div>
-                    </div>
-                    
-                    <div class="pt-4 border-t border-slate-800">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2">Gemini API Key</label>
-                        <div class="flex gap-2">
-                            <input type="password" id="manager-gemini-key" placeholder="Enter Gemini API Key..." 
-                                class="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-slate-200">
-                            <button onclick="saveManagerKey('gemini')" class="px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all">Save</button>
-                        </div>
-                        <div class="flex gap-2 mt-2">
-                            <button onclick="deleteManagerKey('gemini')" class="text-[10px] text-red-400 hover:text-red-300 font-bold uppercase tracking-wider transition-colors">Delete Key</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
-                    <p class="text-[10px] text-slate-500 leading-relaxed">
-                        <span class="font-bold text-amber-500 uppercase tracking-widest block mb-1">Security Note</span>
-                        These keys are stored locally in your browser's storage. Deleting them will remove access to real-time features until a new key is added.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <script type="module" src="js/script.js"></script>
 </body>
