@@ -1,4 +1,5 @@
 // Initialize Lucide Icons
+console.log("StudyHub script loading...");
 lucide.createIcons();
 
 // Gemini API Integration
@@ -7,7 +8,11 @@ import { GoogleGenAI } from "@google/genai";
 // Fallback for environment variables in static hosting
 const getEnv = (key) => {
     try {
-        // Try Vite's import.meta.env first
+        // Try localStorage first (user-provided override)
+        const localValue = localStorage.getItem(`STUDYHUB_${key}`);
+        if (localValue) return localValue;
+
+        // Try Vite's import.meta.env
         if (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env[key]) {
             return import.meta.env[key];
         }
@@ -91,6 +96,16 @@ const driveIframe = document.getElementById('drive-iframe');
 const viewerTitle = document.getElementById('viewer-title');
 const viewerLoader = document.getElementById('viewer-loader');
 const viewerExternal = document.getElementById('viewer-external');
+
+function saveNewsKeyFromUI() {
+    const input = document.getElementById('news-api-key-input');
+    const key = input.value.trim();
+    if (key) {
+        window.setNewsApiKey(key);
+    } else {
+        showToast("Please enter a valid key", "alert-circle");
+    }
+}
 
 // Functions
 function showToast(message, icon = 'info') {
@@ -198,7 +213,22 @@ async function fetchNews() {
                     <i data-lucide="key" class="w-8 h-8 text-amber-500"></i>
                 </div>
                 <h3 class="text-lg font-bold text-slate-200">API Key Required</h3>
-                <p class="text-slate-500 text-sm max-w-xs">Please set <code class="bg-slate-800 px-1 rounded text-indigo-400">VITE_NEWS_API_KEY</code> to see real-time news. On GitHub Pages, you may need to hardcode this temporarily or use a build tool.</p>
+                <p class="text-slate-500 text-sm max-w-xs">To see real-time news, you need a free API key from <a href="https://gnews.io/" target="_blank" class="text-indigo-400 hover:underline font-medium">GNews.io</a>.</p>
+                
+                <div class="mt-6 w-full max-w-xs space-y-3">
+                    <div class="relative">
+                        <input type="password" id="news-api-key-input" placeholder="Paste your GNews API key here..." 
+                            class="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-xl text-slate-200 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all">
+                    </div>
+                    <button onclick="saveNewsKeyFromUI()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-500/20 active:scale-[0.98]">
+                        Save & Refresh
+                    </button>
+                </div>
+
+                <div class="mt-8 pt-6 border-t border-slate-800/50 w-full max-w-xs">
+                    <p class="text-[10px] uppercase font-black text-slate-500 mb-2 tracking-wider">Developer Option</p>
+                    <code class="text-[11px] text-indigo-400/70 break-all bg-slate-900/50 p-2 rounded-lg block">setNewsApiKey('YOUR_KEY')</code>
+                </div>
             </div>
         `;
         lucide.createIcons();
@@ -1211,4 +1241,5 @@ window.copyOfflinePath = copyOfflinePath;
 window.selectFolderForMove = selectFolderForMove;
 window.fetchNews = fetchNews;
 window.openNewsModal = openNewsModal;
-window.filterNews = window.filterNews; // Already assigned but for clarity
+window.filterNews = filterNews;
+window.saveNewsKeyFromUI = saveNewsKeyFromUI;

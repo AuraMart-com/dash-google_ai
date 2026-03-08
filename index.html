@@ -6,6 +6,20 @@
     <title>StudyHub - Your Professional Study Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
+    <script>
+        // Global Helpers for Console
+        window.setNewsApiKey = (key) => {
+            localStorage.setItem('STUDYHUB_VITE_NEWS_API_KEY', key);
+            alert('News API Key saved! Reloading...');
+            location.reload();
+        };
+        window.setGeminiApiKey = (key) => {
+            localStorage.setItem('STUDYHUB_VITE_GEMINI_API_KEY', key);
+            alert('Gemini API Key saved! Reloading...');
+            location.reload();
+        };
+        console.log("StudyHub Helpers Loaded. Use setNewsApiKey('your_key') in console.");
+    </script>
     <!-- Supabase CDN -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <!-- Import Map for Gemini -->
@@ -17,6 +31,9 @@
     }
     </script>
     <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-[#0f172a] text-slate-200 font-sans">
     <!-- Offline Resource Modal -->
     <div id="offline-modal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
         <div class="bg-[#1e293b] rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-800">
@@ -43,10 +60,6 @@
             </div>
         </div>
     </div>
-
-    <script src="https://unpkg.com/lucide@latest"></script>
-</head>
-<body class="bg-[#0f172a] text-slate-200 font-sans">
     <div class="flex h-screen overflow-hidden">
         <!-- Sidebar -->
         <aside class="w-64 bg-[#1e293b] border-r border-slate-800 flex flex-col shrink-0">
