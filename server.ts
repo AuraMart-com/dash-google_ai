@@ -26,11 +26,11 @@ async function startServer() {
 
   // API routes
   app.get('/api/news', async (req, res) => {
-    const { q } = req.query;
-    const apiKey = process.env.NEWS_API_KEY || process.env.VITE_NEWS_API_KEY;
+    const { q, apikey } = req.query;
+    const apiKey = apikey || process.env.NEWS_API_KEY || process.env.VITE_NEWS_API_KEY;
 
     if (!apiKey) {
-      return res.status(401).json({ errors: ["News API Key is missing on the server."] });
+      return res.status(401).json({ errors: ["News API Key is missing. Please provide it in the UI or environment."] });
     }
 
     const gnewsUrl = `https://gnews.io/api/v4/search?q=${encodeURIComponent(q as string)}&lang=en&max=15&apikey=${apiKey}`;

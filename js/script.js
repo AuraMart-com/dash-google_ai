@@ -250,7 +250,7 @@ async function fetchNews() {
     
     const url = isStaticHost 
         ? `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=15&apikey=${NEWS_API_KEY}`
-        : `/api/news?q=${encodeURIComponent(query)}`;
+        : `/api/news?q=${encodeURIComponent(query)}&apikey=${NEWS_API_KEY || ''}`;
 
     try {
         const response = await fetch(url);
