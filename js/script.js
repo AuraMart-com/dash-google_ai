@@ -199,6 +199,11 @@ function openDriveViewer(url, title) {
             if (url.endsWith('/')) previewUrl += 'preview';
             else previewUrl += '/preview';
         }
+    } else if (url.startsWith('Local:')) {
+        // Can't open local paths in iframe
+        showToast("Cannot open local paths in viewer", "alert-circle");
+        closeDriveViewer();
+        return;
     }
     
     driveIframe.src = previewUrl;
@@ -346,8 +351,13 @@ function renderResources() {
         
         const icon = getResourceIcon(res.type);
         const displayUrl = res.link_url || '#';
-        const isOffline = res.is_offline;
+        const isLocalReference = res.link_url && res.link_url.startsWith('Local:');
+        const isOffline = res.is_offline || isLocalReference;
         const isGoogleDrive = res.is_google_drive;
+        const isUploadedFile = res.link_url && (res.link_url.includes('supabase.co/storage') || res.link_url.startsWith('blob:'));
+        
+        const linkLabel = isLocalReference ? 'Local File' : (isGoogleDrive ? 'View in App' : (isUploadedFile ? 'View File' : 'Open Link'));
+        const linkIcon = isLocalReference ? 'hard-drive' : (isGoogleDrive ? 'file-text' : (isUploadedFile ? 'file' : 'external-link'));
         
         resEl.innerHTML = `
             <div class="flex items-start gap-4">
@@ -364,8 +374,8 @@ function renderResources() {
                     <p class="text-xs text-slate-500 truncate mb-2">${res.author || 'Unknown'}</p>
                     <div class="flex items-center gap-2">
                         <span class="text-[10px] font-bold text-indigo-400 flex items-center gap-1">
-                            <i data-lucide="${isOffline ? 'hard-drive' : (isGoogleDrive ? 'file-text' : 'external-link')}" class="w-3 h-3"></i>
-                            ${isOffline ? 'View Path' : (isGoogleDrive ? 'View in App' : 'Open')}
+                            <i data-lucide="${linkIcon}" class="w-3 h-3"></i>
+                            ${linkLabel}
                         </span>
                         <span class="text-[10px] text-slate-600">•</span>
                         <span class="text-[10px] text-slate-500">${res.type}</span>
@@ -379,9 +389,9 @@ function renderResources() {
                 e.stopPropagation();
                 showContextMenu(e, res, 'resource');
             } else {
-                if (isOffline) {
+                if (isLocalReference) {
                     openOfflineModal(res.link_url);
-                } else if (isGoogleDrive) {
+                } else if (isGoogleDrive || isUploadedFile) {
                     openDriveViewer(res.link_url, res.title);
                 } else {
                     window.open(displayUrl, '_blank');
@@ -622,16 +632,24 @@ async function handleResourceSubmit(e) {
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random()}.${fileExt}`;
             const { data, error } = await supabaseClient.storage.from('resources').upload(`uploads/${fileName}`, file);
-            if (error) throw error;
-            const { data: { publicUrl } } = supabaseClient.storage.from('resources').getPublicUrl(`uploads/${fileName}`);
-            finalUrl = publicUrl;
+            
+            if (error) {
+                console.warn("Supabase upload failed, using temporary blob URL:", error);
+                // Fallback: Use a temporary blob URL so it can be viewed in the current session
+                finalUrl = URL.createObjectURL(file);
+                showToast("Stored temporarily. Create a 'resources' bucket in Supabase for permanent storage.", "alert-triangle");
+            } else {
+                const { data: { publicUrl } } = supabaseClient.storage.from('resources').getPublicUrl(`uploads/${fileName}`);
+                finalUrl = publicUrl;
+            }
         } catch (err) {
-            console.error(err);
-            showToast("Upload failed", "alert-circle");
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-            return;
+            console.error("Upload error:", err);
+            finalUrl = `Local: ${file.name}`;
+            showToast("Stored as local reference", "info");
         }
+    } else if (activeInputMode === 'file' && file && !supabaseClient) {
+        finalUrl = `Local: ${file.name}`;
+        showToast("Stored as local reference (No Supabase)", "info");
     }
 
     try {
