@@ -98,6 +98,8 @@ const viewerLoader = document.getElementById('viewer-loader');
 const viewerExternal = document.getElementById('viewer-external');
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebar-toggle');
+const sidebarClose = document.getElementById('sidebar-close');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
 const passwordModal = document.getElementById('password-modal');
 const apiManagerModal = document.getElementById('api-manager-modal');
 const accessPasswordInput = document.getElementById('access-password');
@@ -117,7 +119,26 @@ function saveNewsKeyFromUI() {
 // Sidebar Toggle
 if (sidebarToggle) {
     sidebarToggle.addEventListener('click', () => {
-        sidebar.classList.toggle('minimized');
+        if (window.innerWidth <= 768) {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('active');
+        } else {
+            sidebar.classList.toggle('minimized');
+        }
+    });
+}
+
+if (sidebarClose) {
+    sidebarClose.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
+    });
+}
+
+if (sidebarOverlay) {
+    sidebarOverlay.addEventListener('click', () => {
+        sidebar.classList.remove('open');
+        sidebarOverlay.classList.remove('active');
     });
 }
 
@@ -181,6 +202,31 @@ function deleteManagerKey(type) {
         localStorage.removeItem('STUDYHUB_VITE_GEMINI_API_KEY');
         managerGeminiKeyInput.value = '';
         showToast("Gemini API Key deleted", "trash-2");
+    }
+}
+
+async function testNewsKey() {
+    const key = managerNewsKeyInput.value.trim();
+    if (!key) {
+        showToast("Enter a key to test", "alert-circle");
+        return;
+    }
+    
+    showToast("Testing key...", "loader");
+    const url = `/api/news?q=test&apikey=${key}`;
+    
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (response.ok) {
+            showToast("Key is VALID! Connection successful.", "check-circle");
+        } else {
+            const msg = data.errors ? data.errors[0] : (data.message || "Invalid key");
+            showToast(`Error: ${msg}`, "alert-triangle");
+        }
+    } catch (e) {
+        showToast("Network error during test", "alert-circle");
     }
 }
 
@@ -334,8 +380,16 @@ async function fetchNews() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.errors ? data.errors[0] : "API limit reached or invalid key");
+            let errorMsg = "API limit reached or invalid key";
+            if (data.errors && data.errors[0]) errorMsg = data.errors[0];
+            else if (data.message) errorMsg = data.message;
+            throw new Error(errorMsg);
         }
+        
+        if (!data.articles || data.articles.length === 0) {
+            throw new Error("No articles found for this category.");
+        }
+
         newsItems = data.articles.map((article, index) => ({
             id: `news-${index}-${Date.now()}`,
             title: article.title,
@@ -357,15 +411,20 @@ async function fetchNews() {
     } catch (err) {
         console.error("News API Error:", err);
         newsFeed.innerHTML = `
-            <div class="flex flex-col items-center justify-center py-20 gap-4">
+            <div class="flex flex-col items-center justify-center py-20 gap-4 text-center px-6">
                 <div class="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mb-2">
                     <i data-lucide="alert-triangle" class="w-8 h-8 text-red-500"></i>
                 </div>
                 <h3 class="text-lg font-bold text-slate-200">Feed Unavailable</h3>
-                <p class="text-slate-500 text-sm text-center max-w-xs">${err.message || "Could not connect to the news service."}</p>
-                <button onclick="fetchNews()" class="mt-4 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all flex items-center gap-2">
-                    <i data-lucide="refresh-cw" class="w-4 h-4"></i> Try Again
-                </button>
+                <p class="text-slate-500 text-sm max-w-xs">${err.message || "Could not connect to the news service."}</p>
+                <div class="flex gap-3 mt-4">
+                    <button onclick="fetchNews()" class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 text-white rounded-xl font-bold text-sm transition-all flex items-center gap-2">
+                        <i data-lucide="refresh-cw" class="w-4 h-4"></i> Try Again
+                    </button>
+                    <button onclick="deleteManagerKey('news'); location.reload();" class="px-6 py-2.5 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded-xl font-bold text-sm transition-all">
+                        Reset API Key
+                    </button>
+                </div>
             </div>
         `;
         lucide.createIcons();
@@ -1327,3 +1386,4 @@ window.openApiManager = openApiManager;
 window.closeApiManager = closeApiManager;
 window.saveManagerKey = saveManagerKey;
 window.deleteManagerKey = deleteManagerKey;
+window.testNewsKey = testNewsKey;
